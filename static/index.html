@@ -15,7 +15,7 @@
       window.applyTheme = apply; apply(); mq.addEventListener('change', apply);
     })();
   </script>
-  <link rel="stylesheet" href="/static/styles.css?v=20261104f">
+  <link rel="stylesheet" href="/static/styles.css?v=20261104g">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -278,22 +278,6 @@
                 <select id="story-saved" style="min-height:36px;padding:6px 10px;font-size:13px;width:auto;max-width:260px">
                   <option value="" data-i18n="story.13">保存した台本を開く…</option></select></div></div>
 
-            <details class="group story-ai" id="story-ai"><summary><span data-i18n="story.14">AI に下書きしてもらう(手元の AI・無料)</span><svg width="18" height="18"><use href="#i-down"/></svg></summary>
-              <div class="group-body">
-                <div class="field"><label for="story-theme" data-i18n="story.15">テーマ</label>
-                  <input id="story-theme" class="input" maxlength="300" placeholder="例: Why the strongest men walk alone / 誘惑に勝つ男の生き方" data-i18n-attr="placeholder:story.1"></div>
-                <div class="row" style="flex-wrap:wrap;gap:16px;align-items:flex-end">
-                  <div class="field" style="margin:0"><span class="label" id="l-story-style" data-i18n="story.16">語り口</span>
-                    <div class="segmented" role="group" aria-labelledby="l-story-style" id="story-style">
-                      <button data-v="bhatt" aria-pressed="true" data-i18n="story.17">静かな説教調</button><button data-v="motivation" data-i18n="story.18">熱いスピーチ</button></div></div>
-                  <div class="field" style="margin:0"><span class="label" id="l-story-min" data-i18n="story.19">長さ</span>
-                    <div class="segmented" role="group" aria-labelledby="l-story-min" id="story-minutes">
-                      <button data-v="3" data-i18n="story.20">3分(お試し)</button><button data-v="10" aria-pressed="true" data-i18n="story.21">10分</button><button data-v="20" data-i18n="story.22">20分</button><button data-v="35" data-i18n="story.23">35分</button></div></div>
-                  <button class="btn" id="story-draft"><svg width="18" height="18" aria-hidden="true"><use href="#i-script"/></svg><span data-i18n="story.24">下書きを作る</span></button>
-                </div>
-                <p class="hint" style="font-size:12px;color:var(--color-muted-foreground);margin:8px 0 0" data-i18n="story.25">Ollama(qwen2.5)で英語の台本を章ごとに書きます。35分だと数分かかります。できた台本は下の欄に入るので、読んで直してから動画にしてください。</p>
-              </div></details>
-
             <details class="group story-batch" id="story-batch"><summary><span data-i18n="story.batch_title">まとめて作る(一括)</span><span class="badge badge-idle" id="story-batch-count" hidden></span><svg width="18" height="18"><use href="#i-down"/></svg></summary>
               <div class="group-body">
                 <p class="hint" style="font-size:12px;color:var(--color-muted-foreground);margin:0 0 10px" data-i18n="story.batch_hint">保存した台本を選ぶと、右の「仕上がり」の設定で 1 本ずつ順番に動画にします(同時には作らないので Mac に負担をかけません)。進み具合は「2. 動画にする」に出ます。</p>
@@ -315,6 +299,22 @@
               <span class="video-meta" id="story-stats" aria-live="polite"></span></div>
               <textarea id="story-text" class="script-text" spellcheck="true" placeholder="空行で段落(=1シーン)を区切ります。&#10;## 章の見出し  … 章の始まり(説明欄のチャプターになります)&#10;[[query:storm clouds]]  … その段落の映像を指定(任意)&#10;&#10;## The Lonely Road&#10;&#10;Every man reaches a point where nobody claps for him anymore.&#10;&#10;And that is exactly where his real life begins." data-i18n-attr="placeholder:story.3"></textarea>
               <span class="hint" data-i18n="story.28">自動で保存されます。段落ごとに 1 シーン(声・映像・字幕)になります。</span></div>
+
+            <details class="group story-ai" style="margin-top:16px" id="story-ai"><summary><span data-i18n="story.14">AI に下書きしてもらう(手元の AI・無料)</span><svg width="18" height="18"><use href="#i-down"/></svg></summary>
+              <div class="group-body">
+                <div class="field"><label for="story-theme" data-i18n="story.15">テーマ</label>
+                  <input id="story-theme" class="input" maxlength="300" placeholder="例: Why the strongest men walk alone / 誘惑に勝つ男の生き方" data-i18n-attr="placeholder:story.1"></div>
+                <div class="row" style="flex-wrap:wrap;gap:16px;align-items:flex-end">
+                  <div class="field" style="margin:0"><span class="label" id="l-story-style" data-i18n="story.16">語り口</span>
+                    <div class="segmented" role="group" aria-labelledby="l-story-style" id="story-style">
+                      <button data-v="bhatt" aria-pressed="true" data-i18n="story.17">静かな説教調</button><button data-v="motivation" data-i18n="story.18">熱いスピーチ</button></div></div>
+                  <div class="field" style="margin:0"><span class="label" id="l-story-min" data-i18n="story.19">長さ</span>
+                    <div class="segmented" role="group" aria-labelledby="l-story-min" id="story-minutes">
+                      <button data-v="3" data-i18n="story.20">3分(お試し)</button><button data-v="10" aria-pressed="true" data-i18n="story.21">10分</button><button data-v="20" data-i18n="story.22">20分</button><button data-v="35" data-i18n="story.23">35分</button></div></div>
+                  <button class="btn" id="story-draft"><svg width="18" height="18" aria-hidden="true"><use href="#i-script"/></svg><span data-i18n="story.24">下書きを作る</span></button>
+                </div>
+                <p class="hint" style="font-size:12px;color:var(--color-muted-foreground);margin:8px 0 0" data-i18n="story.25">Ollama(qwen2.5)で英語の台本を章ごとに書きます。35分だと数分かかります。できた台本は下の欄に入るので、読んで直してから動画にしてください。</p>
+              </div></details>
           </div>
 
           <div class="card" id="story-match-card" hidden>
@@ -635,12 +635,12 @@
   <div class="modal-body" id="post-modal-body"></div>
 </dialog>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
-<script src="/static/i18n.js?v=20261104f"></script>
-<script src="/static/app.js?v=20261104f"></script>
-<script src="/static/inbox.js?v=20261104f"></script>
-<script src="/static/posts.js?v=20261104f"></script>
-<script src="/static/rights.js?v=20261104f"></script>
-<script src="/static/story.js?v=20261104f"></script>
-<script src="/static/fonts.js?v=20261104f"></script>
+<script src="/static/i18n.js?v=20261104g"></script>
+<script src="/static/app.js?v=20261104g"></script>
+<script src="/static/inbox.js?v=20261104g"></script>
+<script src="/static/posts.js?v=20261104g"></script>
+<script src="/static/rights.js?v=20261104g"></script>
+<script src="/static/story.js?v=20261104g"></script>
+<script src="/static/fonts.js?v=20261104g"></script>
 </body>
 </html>
