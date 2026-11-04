@@ -6,7 +6,13 @@ Prints one JSON line per audio: [{"w": "Every", "s": 0.0, "e": 0.26}, ...] (Engl
 About 10x faster than openai-whisper on the CPU of an M-series Mac, same Whisper weights.
 """
 import json
+import os
 import sys
+from pathlib import Path
+
+_hub = Path.home() / ".cache" / "huggingface" / "hub"   # cached models: no hub lookup (flaky connections)
+if (_hub / "models--mlx-community--whisper-base-asr-fp16").exists():
+    os.environ.setdefault("HF_HUB_OFFLINE", "1")
 
 from mlx_audio.stt.utils import load_model
 

@@ -19,6 +19,13 @@ recognised (Dia sometimes mumbles or makes noise) is redone. The finished paragr
 word timings are written next to it as <out>.heard.json for the subtitles.
 Files that already exist are skipped. Progress: "TTS <done> <total>".
 """
+from pathlib import Path
+import os
+# the models are cached after the first download: don't ask the Hugging Face server on every run
+# (a dropped connection there made loading fail: "Server disconnected without sending a response")
+_hub = Path.home() / ".cache" / "huggingface" / "hub"
+if all((_hub / d).exists() for d in ("models--mlx-community--Dia-1.6B-4bit", "models--mlx-community--whisper-base-asr-fp16")):
+    os.environ.setdefault("HF_HUB_OFFLINE", "1")
 import glob
 import json
 import math
