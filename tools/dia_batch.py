@@ -52,7 +52,7 @@ MAX_WORDS = 24          # per chunk (~6-9 s of speech)
 WPS = 2.5               # target words per second (calm narration)
 MAX_DRIFT = 0.18        # allowed |log2(chunk pitch / reference pitch)| (~13 %): same speaker stays well inside, a male->female flip is ~0.8
 TRIES = 5
-TEMPERATURE = 1.0       # Dia's default 1.3 wanders between speakers; lower = steadier voice, fewer redos
+TEMPERATURE = 0.85      # Dia's default 1.3 wanders between speakers; lower = steadier voice, fewer redos
 TOKENS_PER_SEC = 86     # Dia's audio frame rate
 MAX_SECS_PER_WORD = 0.5 # cap the generation length (Dia sometimes runs on with noise)
 PAUSE = 0.25            # silence between chunks of one paragraph (s)
@@ -98,6 +98,22 @@ def pitch(path):
     return float(np.nanmedian(f)) if np.isfinite(np.nanmedian(f)) else 0.0, len(y) / sr
 
 
+MAX_SPIKE = 15.0        # dB: loudest frame above the median voiced frame (good takes sit at 8-13; a clap/laugh/noise burst is louder)
+MAX_TIMBRE = 0.25       # allowed |log2(brightness / reference brightness)|: a different voice sounds darker/brighter
+
+
+def voice_feat(path):
+    """(pitch Hz, spectral centroid Hz, loudest-frame spike dB): what makes a take 'the same voice'
+    and free of sound effects."""
+    y, sr = librosa.load(str(path), sr=16000)
+    f, _, _ = librosa.pyin(y, fmin=60, fmax=400, sr=sr)
+    hz = float(np.nanmedian(f)) if np.isfinite(np.nanmedian(f)) else 0.0
+    cent = float(np.median(librosa.feature.spectral_centroid(y=y, sr=sr)[0]))
+    db = 20 * np.log10(librosa.feature.rms(y=y, frame_length=512, hop_length=160)[0] + 1e-6)
+    spike = float(db.max() - np.median(db[db > db.max() - 35]))
+    return hz, cent, spike, len(y) / sr
+
+
 def say(model, text, seed, out_dir, name, ref=None, ref_text=REF_TEXT):
     mx.random.seed(int(seed))
     words = len(text.split()) + (len(ref_text.split()) if ref else 0)   # the prompt is part of the output
@@ -130,7 +146,7 @@ def main(path):
     model = load_model(MODEL)
     if not ref.exists():               # also the voice sample on the 台本 page (items = [])
         say(model, REF_TEXT, seed, ref_dir, f"dia_seed{seed}")
-    ref_hz, _ = pitch(ref)
+    ref_hz, ref_cent, _, _ = voice_feat(ref)
     print(f"REF {ref_hz:.0f}", flush=True)
     stt = load_stt(STT)
     done = len(items) - len(todo)
@@ -142,16 +158,21 @@ def main(path):
                 for t in range(tries):
                     wait_for_memory(mx.clear_cache)
                     wav = say(model, text, seed + 1000 * t + k, tmp, f"c{k}_{t}", ref, ref_text)
-                    hz, dur = pitch(wav)
+                    hz, cent, spike, dur = voice_feat(wav)
                     drift = abs(math.log2(hz / ref_hz)) if hz and ref_hz else 9
+                    timbre = abs(math.log2(cent / ref_cent)) if cent and ref_cent else 9
                     clear = recall(text, heard(stt, wav))
-                    ok = drift <= MAX_DRIFT and clear >= MIN_HEARD
-                    score = (clear >= MIN_HEARD, -drift, clear)       # intelligible first, then the voice
+                    clean = spike <= MAX_SPIKE and timbre <= MAX_TIMBRE
+                    ok = drift <= MAX_DRIFT and clear >= MIN_HEARD and clean
+                    # intelligible first, then no effect noise / same timbre, then the pitch
+                    score = (clear >= MIN_HEARD, clean, -(drift + timbre + max(0, spike - MAX_SPIKE) / 10), clear)
                     if best is None or score > best[3]:
-                        best = (wav, drift, dur, score, clear)
+                        best = (wav, drift, dur, score, clear, spike, timbre)
                     if ok:
                         break
-                wav, drift, dur, _, clear = best
+                wav, drift, dur, _, clear, spike, timbre = best
+                if spike > MAX_SPIKE or timbre > MAX_TIMBRE:
+                    print(f"WARN odd take (spike {spike:.0f} dB, timbre {timbre:.2f}) on: {text[:60]}", flush=True)
                 if drift > MAX_DRIFT:
                     print(f"WARN pitch drift {drift:.2f} on: {text[:60]}", flush=True)
                 if clear < MIN_HEARD:
@@ -161,7 +182,9 @@ def main(path):
                 tempo = max(0.8, min(1.0, dur / want)) if want else 1.0
                 fixed = Path(tmp) / f"fix{k}.wav"
                 subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(wav), "-af",
-                                f"atempo={tempo:.3f}", "-ar", "44100", "-ac", "1", str(fixed)], check=True)
+                                # same loudness for every chunk, soft limiting of sudden loud bits
+                                f"atempo={tempo:.3f},highpass=f=60,acompressor=threshold=-22dB:ratio=3:attack=5:release=80,"
+                                "loudnorm=I=-18:TP=-2", "-ar", "44100", "-ac", "1", str(fixed)], check=True)
                 parts.append(fixed)
             out = Path(it["out"]); out.parent.mkdir(parents=True, exist_ok=True)
             lst = Path(tmp) / "list.txt"
