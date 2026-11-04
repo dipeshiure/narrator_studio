@@ -204,13 +204,30 @@ def load_script(path):
 
 STYLES = {
     "bhatt": ("a deep, calm, sermon-like long-form motivational narration in the second person "
-              "(\"you\"), about becoming a disciplined man: resisting temptation, silence, patience, "
-              "faith in God, solitude, purpose, pain as a teacher. Short, heavy sentences. Rhetorical "
-              "questions. Occasional one-line truths. Stories of an unnamed man or an old teacher are "
-              "welcome. No hype words like 'smash that like button'."),
+              "(\"you\"). Stay strictly on the video's theme; the tone is heavy and quiet: short sentences, "
+              "rhetorical questions, occasional one-line truths. Motifs you may draw on when they fit the "
+              "theme: solitude, silence, patience, faith in God, discipline, purpose, pain as a teacher. "
+              "Stories of an unnamed man or an old teacher are welcome. No hype words like 'smash that like button'."),
     "motivation": ("an intense motivational speech in the second person (\"you\"): discipline, "
                    "hard work, failure, getting back up, chasing a dream. Short punchy sentences, "
                    "rising energy, a powerful ending."),
+}
+
+
+# Retention structure for the spoken script (adapted from the "youtube-script-writer" skill by mohitagw15856,
+# pm-claude-skills): packaging -> cold open -> stakes -> chapters with a payoff each -> climax -> no goodbye.
+RETENTION = {
+    "first": ("This is the opening. Start with a hook in the first two sentences that delivers on the title's "
+              "promise at once: a bold claim, a short story setup, or a question the viewer needs answered. No "
+              "greeting, no 'welcome', no introduction of yourself. Then, within about 30 seconds of narration, "
+              "state the stakes: why this matters, what it costs to ignore it, and what the viewer will have by the end."),
+    "middle": ("Give this chapter one clear idea and end it with a small payoff (a truth the viewer can keep). "
+               "Open it with a short re-hook: a question, a contrast or a surprising line, never a recap. "
+               "Vary the rhythm: a short punchy sentence after every long one."),
+    "last": ("This is the climax: deliver the biggest truth the opening promised. Do not say 'in conclusion', "
+             "'to sum up', 'thank you for watching' or any goodbye. End on a strong closing line that points "
+             "the viewer forward to what to do next."),
+    "all": "Conversational spoken English: short sentences, natural pauses, no academic words, no filler openers.",
 }
 
 
@@ -267,6 +284,8 @@ def draft_script(theme, minutes=10, style="bhatt", s=None, log=print):
     log(f"台本の構成を作っています({minutes} 分 / {n} 章)")
     outline = json.loads(_ollama(
         f"Plan a YouTube video script: {voice}\nTheme: {theme}\n"
+        "Structure: a hook that promises a result, the stakes, then chapters that each build one idea toward a "
+        "final payoff. Make the title under 60 characters, specific, and curiosity-driven. "
         f"Return JSON: {{\"title\": catchy title under 70 characters, \"thumbnail\": 2-4 word thumbnail "
         f"text, \"description\": 2 sentence YouTube description, \"chapters\": [exactly {n} short chapter "
         "headings]}. English only.", model, as_json=True))
@@ -285,8 +304,9 @@ def draft_script(theme, minutes=10, style="bhatt", s=None, log=print):
         body = _ollama(
             f"You are writing {voice}\nVideo title: {title}\nChapter {i + 1} of {len(heads)}: {head}\n"
             + (f"Earlier chapters covered: {story_so_far[-600:]}\n" if story_so_far else "")
-            + f"Write about {words} words of narration for this chapter only. " + rules
-            + (" End the whole video with a strong closing line." if i == len(heads) - 1 else ""), model)
+            + f"Write about {words} words of narration for this chapter only. " + rules + " " + RETENTION["all"] + " "
+            + " ".join(RETENTION[k] for k in (["first"] if i == 0 else []) + (["last"] if i == len(heads) - 1 else [])
+                       or ["middle"]), model)
         paras = _dedupe(_paragraphs(body), seen)
         for _ in range(3):             # models stop early: ask for more until the chapter is long enough
             have = sum(len(x.split()) for x in paras)
