@@ -5,6 +5,8 @@ Runs in tools/dia_venv (mlx-audio, model mlx-community/Dia-1.6B-4bit).
 
 jobs.json: {"seed": 33, "ref_dir": "/abs/dir",
             "items": [{"text": "...", "out": "/abs/scene.wav"}, ...]}
+Optional "ref_audio" + "ref_text": a recorded voice (and what is said in it) to use as the
+speaker instead of the seed's invented one ("my voices" on the 台本 page).
 
 Dia has no fixed voices: every run invents a speaker. To keep ONE voice for a whole
 video, a reference clip is made once per seed (cached in ref_dir) and passed as the
@@ -89,11 +91,11 @@ def pitch(path):
     return float(np.nanmedian(f)) if np.isfinite(np.nanmedian(f)) else 0.0, len(y) / sr
 
 
-def say(model, text, seed, out_dir, name, ref=None):
+def say(model, text, seed, out_dir, name, ref=None, ref_text=REF_TEXT):
     mx.random.seed(int(seed))
-    words = len(text.split()) + (len(REF_TEXT.split()) if ref else 0)   # the prompt is part of the output
+    words = len(text.split()) + (len(ref_text.split()) if ref else 0)   # the prompt is part of the output
     generate_audio(text="[S1] " + text, model=model, ref_audio=str(ref) if ref else None,
-                   ref_text=("[S1] " + REF_TEXT) if ref else None, temperature=TEMPERATURE,
+                   ref_text=("[S1] " + ref_text) if ref else None, temperature=TEMPERATURE,
                    max_tokens=int((words * MAX_SECS_PER_WORD + 3) * TOKENS_PER_SEC),
                    output_path=str(out_dir), file_prefix=name, verbose=False)
     files = sorted(glob.glob(f"{out_dir}/{name}_*.wav"))
@@ -110,7 +112,8 @@ def main(path):
     todo = [it for it in items if not Path(it["out"]).exists()]
     print(f"TTS {len(items) - len(todo)} {len(items)}", flush=True)
     ref_dir = Path(job["ref_dir"]); ref_dir.mkdir(parents=True, exist_ok=True)
-    ref = ref_dir / f"dia_seed{seed}.wav"
+    ref_text = job.get("ref_text") or REF_TEXT
+    ref = Path(job["ref_audio"]) if job.get("ref_audio") else ref_dir / f"dia_seed{seed}.wav"
     if not todo and ref.exists():
         return 0
     unload_llms()                            # the local LLM can hold 4+ GB
@@ -129,7 +132,7 @@ def main(path):
                 best = None
                 for t in range(TRIES):
                     wait_for_memory(mx.clear_cache)
-                    wav = say(model, text, seed + 1000 * t + k, tmp, f"c{k}_{t}", ref)
+                    wav = say(model, text, seed + 1000 * t + k, tmp, f"c{k}_{t}", ref, ref_text)
                     hz, dur = pitch(wav)
                     drift = abs(math.log2(hz / ref_hz)) if hz and ref_hz else 9
                     clear = recall(text, heard(stt, wav))

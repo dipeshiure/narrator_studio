@@ -526,5 +526,20 @@
  "js.story.q_skipped": "건너뜀",
  "js.story.q_error": "실패",
  "kc.cinema": "시네마",
- "kc.impact": "임팩트"
+ "kc.impact": "임팩트",
+ "voice.title": "내 목소리 쓰기(녹음에서)",
+ "voice.hint": "5–15초 정도 또렷하게 말한 영어 녹음을 넣으면 Dia가 그 목소리와 비슷하게 대본을 읽습니다(이 Mac 안에서만 처리). 잡음이나 음악이 없을수록 비슷해집니다.",
+ "voice.file": "녹음 파일(mp3·m4a·wav 등)",
+ "voice.name": "이름",
+ "voice.name_ph": "예: 내 목소리",
+ "voice.text": "녹음에서 말한 내용(비워 두면 자동으로 받아씁니다)",
+ "voice.consent": "내 목소리이거나 사용 허락을 받은 목소리입니다",
+ "voice.add": "목소리 추가",
+ "js.voice.mine": "녹음한 목소리",
+ "js.voice.play": "{name} 듣기",
+ "js.voice.del_confirm": "이 목소리를 삭제할까요? (녹음 파일도 지워집니다)",
+ "js.voice.need_file": "녹음 파일을 고르세요",
+ "js.voice.need_consent": "내 목소리나 허락받은 목소리만 추가할 수 있습니다(체크하세요)",
+ "js.voice.adding": "목소리를 추가하는 중…(받아쓰기에 조금 걸립니다)",
+ "js.voice.added": "목소리를 추가했습니다. 내레이터에서 고를 수 있습니다"
 }

@@ -532,5 +532,20 @@
  "js.story.q_skipped": "Skipped",
  "js.story.q_error": "Failed",
  "kc.cinema": "Cinema",
- "kc.impact": "Impact"
+ "kc.impact": "Impact",
+ "voice.title": "Use your own voice (from a recording)",
+ "voice.hint": "Add a clear 5–15 second English recording and Dia reads the script in a voice like it (processed only on this Mac). Recordings without noise or music match best.",
+ "voice.file": "Recording (mp3, m4a, wav…)",
+ "voice.name": "Name",
+ "voice.name_ph": "e.g. My voice",
+ "voice.text": "What is said in the recording (left empty: transcribed automatically)",
+ "voice.consent": "This is my voice, or I have permission to use it",
+ "voice.add": "Add voice",
+ "js.voice.mine": "Recorded voices",
+ "js.voice.play": "Play {name}",
+ "js.voice.del_confirm": "Delete this voice? (The recording is removed too.)",
+ "js.voice.need_file": "Choose a recording",
+ "js.voice.need_consent": "Only your own voice or one you may use can be added (tick the box)",
+ "js.voice.adding": "Adding the voice… (transcribing takes a moment)",
+ "js.voice.added": "Voice added. Pick it under Narrator"
 }

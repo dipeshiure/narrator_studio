@@ -15,7 +15,7 @@
       window.applyTheme = apply; apply(); mq.addEventListener('change', apply);
     })();
   </script>
-  <link rel="stylesheet" href="/static/styles.css?v=20261104c">
+  <link rel="stylesheet" href="/static/styles.css?v=20261104d">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -372,6 +372,19 @@
                 <div class="row"><select id="story-voice"></select><select id="story-dia-voice" hidden></select>
                   <button class="icon-btn" id="story-voice-play" aria-label="声を試聴" title="試聴" data-i18n-attr="aria-label:story.5;title:story.6"><svg width="20" height="20" aria-hidden="true"><use href="#i-volume"/></svg></button></div>
                 <audio id="story-voice-audio" hidden></audio></div>
+              <details class="group story-dia my-voices" id="my-voices"><summary><span data-i18n="voice.title">自分の声を使う(録音から)</span><svg width="18" height="18"><use href="#i-down"/></svg></summary>
+                <div class="group-body">
+                  <p class="hint" style="font-size:12px;color:var(--color-muted-foreground);margin:0 0 10px" data-i18n="voice.hint">5〜15 秒くらい、はっきり話した英語の録音を入れると、Dia がその声に似せて台本を読みます(この Mac の中だけで処理)。雑音や音楽のない録音ほど似ます。</p>
+                  <ul class="voice-list" id="my-voice-list"></ul>
+                  <div class="field"><label for="my-voice-file" data-i18n="voice.file">録音ファイル(mp3・m4a・wav など)</label>
+                    <input type="file" id="my-voice-file" accept="audio/*,video/*" class="input"></div>
+                  <div class="field"><label for="my-voice-name" data-i18n="voice.name">名前</label>
+                    <input id="my-voice-name" class="input" maxlength="40" placeholder="例: 自分の声" data-i18n-attr="placeholder:voice.name_ph"></div>
+                  <div class="field"><label for="my-voice-text" data-i18n="voice.text">録音で話している内容(空欄なら自動で聞き取ります)</label>
+                    <textarea id="my-voice-text" class="input" rows="2" maxlength="400"></textarea></div>
+                  <label class="check"><input type="checkbox" id="my-voice-consent"><span data-i18n="voice.consent">自分の声、または使う許可をもらった人の声です</span></label>
+                  <div class="row" style="justify-content:flex-end"><button class="btn btn-sm" id="my-voice-add"><svg width="16" height="16" aria-hidden="true"><use href="#i-upload"/></svg><span data-i18n="voice.add">声を追加</span></button></div>
+                </div></details>
               <div class="field"><div class="range-head"><label for="story-rate" data-i18n="story.54">話す速さ</label><output id="o-story-rate"></output></div>
                 <input type="range" id="story-rate" min="-25" max="20" step="1"></div>
               <div class="field story-edge"><div class="range-head"><label for="story-pitch" data-i18n="story.55">声の高さ</label><output id="o-story-pitch"></output></div>
@@ -622,12 +635,12 @@
   <div class="modal-body" id="post-modal-body"></div>
 </dialog>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
-<script src="/static/i18n.js?v=20261104c"></script>
-<script src="/static/app.js?v=20261104c"></script>
-<script src="/static/inbox.js?v=20261104c"></script>
-<script src="/static/posts.js?v=20261104c"></script>
-<script src="/static/rights.js?v=20261104c"></script>
-<script src="/static/story.js?v=20261104c"></script>
-<script src="/static/fonts.js?v=20261104c"></script>
+<script src="/static/i18n.js?v=20261104d"></script>
+<script src="/static/app.js?v=20261104d"></script>
+<script src="/static/inbox.js?v=20261104d"></script>
+<script src="/static/posts.js?v=20261104d"></script>
+<script src="/static/rights.js?v=20261104d"></script>
+<script src="/static/story.js?v=20261104d"></script>
+<script src="/static/fonts.js?v=20261104d"></script>
 </body>
 </html>

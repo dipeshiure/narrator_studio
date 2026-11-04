@@ -31,7 +31,8 @@
     const dia = o.tts === 'dia';
     seg('story-tts', dia ? 'dia' : 'edge');
     $('#story-voice').hidden = dia; $('#story-dia-voice').hidden = !dia;
-    $('#story-dia-voice').value = String(o.dia_seed || 33);
+    $('#story-dia-voice').value = o.dia_voice ? 'v:' + o.dia_voice : String(o.dia_seed || 33);
+    $$('.story-dia').forEach(el => el.hidden = !dia);
     $$('.story-edge').forEach(el => el.hidden = dia);
     const th = $('#story-tts-hint');
     if (dia && opts && !opts.dia_ready) { th.className = 'hint status-warn'; th.textContent = t('js.story.dia_missing') + ': ' + opts.dia_setup; }
@@ -198,7 +199,7 @@
     try {
       opts = await api('/api/story/options');
       const dv = $('#story-dia-voice');
-      if (!dv.options.length) dv.innerHTML = (opts.dia_voices || []).map(x => `<option value="${x.seed}">Dia ${x.label}(seed ${x.seed})</option>`).join('');
+      fillDiaVoices(opts.my_voices || []);
       const v = $('#story-voice');
       if (!v.options.length) v.innerHTML = opts.voices.map(x => `<option value="${x.id}">${x.label}</option>`).join('');
       const sel = $('#story-saved');
@@ -223,7 +224,49 @@
   onSeg('story-style', v => { st.style = v; saveState(); paint(); });
   onSeg('story-minutes', v => { st.minutes = Number(v); saveState(); paint(); });
   $('#story-voice').addEventListener('change', e => set('voice', e.target.value));
-  $('#story-dia-voice').addEventListener('change', e => set('dia_seed', Number(e.target.value)));
+  $('#story-dia-voice').addEventListener('change', e => {
+    const v = e.target.value;
+    if (v.startsWith('v:')) set('dia_voice', v.slice(2));
+    else { st.o.dia_voice = ''; set('dia_seed', Number(v)); }
+  });
+
+  // ------------------------------------------------------------ my voices (recorded reference)
+  function fillDiaVoices(mine) {
+    const dv = $('#story-dia-voice');
+    if (st.o.dia_voice && !mine.some(v => v.id === st.o.dia_voice)) st.o.dia_voice = '';   // deleted
+    dv.innerHTML = (opts.dia_voices || []).map(x => `<option value="${x.seed}">Dia ${x.label}(seed ${x.seed})</option>`).join('')
+      + (mine.length ? `<optgroup label="${esc(t('js.voice.mine'))}">` + mine.map(v =>
+        `<option value="v:${v.id}">${esc(v.name)}</option>`).join('') + '</optgroup>' : '');
+    $('#my-voice-list').innerHTML = mine.map(v => `<li>
+        <span class="batch-title">${esc(v.name)}</span><span class="video-meta">${v.seconds || ''} s</span>
+        <button class="icon-btn" data-play="${v.id}" aria-label="${esc(t('js.voice.play', { name: v.name }))}" title="${esc(t('js.voice.play', { name: v.name }))}"><svg width="18" height="18" aria-hidden="true"><use href="#i-play"/></svg></button>
+        <button class="icon-btn" data-del="${v.id}" aria-label="${esc(t('js.inbox.delete_one', { name: v.name }))}" title="${t('js.inbox.delete')}"><svg width="18" height="18" aria-hidden="true"><use href="#i-trash"/></svg></button></li>`).join('');
+    paint();
+  }
+  $('#my-voice-list').addEventListener('click', async e => {
+    const play = e.target.closest('[data-play]'), del = e.target.closest('[data-del]');
+    if (play) { const a = $('#story-voice-audio'); a.src = `/api/story/voices/${play.dataset.play}/audio`; a.play(); }
+    if (del && confirm(t('js.voice.del_confirm'))) {
+      try { fillDiaVoices((await api(`/api/story/voices/${del.dataset.del}/delete`, { method: 'POST' })).voices); saveState(); }
+      catch (err) { toast(err.message); }
+    }
+  });
+  $('#my-voice-add').addEventListener('click', async () => {
+    const file = $('#my-voice-file').files[0];
+    if (!file) return toast(t('js.voice.need_file'));
+    if (!$('#my-voice-consent').checked) return toast(t('js.voice.need_consent'));
+    const fd = new FormData();
+    fd.append('file', file, file.name); fd.append('name', $('#my-voice-name').value.trim());
+    fd.append('text', $('#my-voice-text').value.trim()); fd.append('consent', '1');
+    const btn = $('#my-voice-add'); btn.disabled = true; toast(t('js.voice.adding'));
+    try {
+      const r = await api('/api/story/voices', { method: 'POST', body: fd });
+      opts.my_voices = r.voices; st.o.dia_voice = r.id; saveState(); fillDiaVoices(r.voices);
+      $('#my-voice-file').value = ''; $('#my-voice-name').value = ''; $('#my-voice-text').value = '';
+      toast(t('js.voice.added'));
+    } catch (e) { toast(e.message); }
+    btn.disabled = false;
+  });
   onSeg('story-tts', v => set('tts', v));
   $('#story-rate').addEventListener('input', e => set('rate', Number(e.target.value)));
   $('#story-pitch').addEventListener('input', e => set('pitch', Number(e.target.value)));
@@ -328,7 +371,7 @@
     const btn = $('#story-voice-play'); btn.disabled = true;
     try {
       const res = await fetch('/api/story/voice-sample', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ engine: st.o.tts === 'dia' ? 'dia' : 'edge', seed: st.o.dia_seed || 33,
+        body: JSON.stringify({ engine: st.o.tts === 'dia' ? 'dia' : 'edge', seed: st.o.dia_seed || 33, voice_id: st.o.dia_voice || '',
                                voice: st.o.voice, rate: signed(st.o.rate, '%'), pitch: signed(st.o.pitch, 'Hz') }) });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
       const a = $('#story-voice-audio'); a.src = URL.createObjectURL(await res.blob()); await a.play();
@@ -359,7 +402,7 @@
   // the 仕上がり panel as server options — shared by "動画を作る" and the batch
   function storyOptions() {
     const o = st.o;
-    return { tts_engine: o.tts === 'dia' ? 'dia' : 'edge', dia_seed: o.dia_seed || 33, voice: o.voice, tts_rate: signed(o.rate, '%'), tts_pitch: signed(o.pitch, 'Hz'),
+    return { tts_engine: o.tts === 'dia' ? 'dia' : 'edge', dia_seed: o.dia_seed || 33, dia_voice: o.dia_voice || '', voice: o.voice, tts_rate: signed(o.rate, '%'), tts_pitch: signed(o.pitch, 'Hz'),
              visuals: o.visuals, hero: o.hero || '', media_folder: o.media_folder || '', aspect: o.aspect, grain: o.grain,
              show_headings: o.headings, subs: o.engine !== 'off',
              subs_engine: o.engine === 'off' ? 'simple' : o.engine,

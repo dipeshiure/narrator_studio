@@ -526,5 +526,20 @@
  "js.story.q_skipped": "跳过",
  "js.story.q_error": "失败",
  "kc.cinema": "电影",
- "kc.impact": "冲击"
+ "kc.impact": "冲击",
+ "voice.title": "使用自己的声音（来自录音）",
+ "voice.hint": "放入 5–15 秒清晰的英文录音，Dia 会用相似的声音朗读脚本（只在本机处理）。没有杂音和音乐的录音更像。",
+ "voice.file": "录音文件（mp3、m4a、wav 等）",
+ "voice.name": "名称",
+ "voice.name_ph": "例：我的声音",
+ "voice.text": "录音中说的内容（留空则自动识别）",
+ "voice.consent": "这是我的声音，或已获得使用许可的声音",
+ "voice.add": "添加声音",
+ "js.voice.mine": "录制的声音",
+ "js.voice.play": "试听 {name}",
+ "js.voice.del_confirm": "要删除这个声音吗？（录音文件也会删除）",
+ "js.voice.need_file": "请选择录音文件",
+ "js.voice.need_consent": "只能添加自己的声音或已获许可的声音（请勾选）",
+ "js.voice.adding": "正在添加声音…（识别需要一点时间）",
+ "js.voice.added": "已添加声音，可在“讲述者”中选择"
 }

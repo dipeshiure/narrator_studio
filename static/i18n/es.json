@@ -526,5 +526,20 @@
  "js.story.q_skipped": "Omitido",
  "js.story.q_error": "Error",
  "kc.cinema": "Cine",
- "kc.impact": "Impacto"
+ "kc.impact": "Impacto",
+ "voice.title": "Usar tu propia voz (desde una grabación)",
+ "voice.hint": "Añade una grabación clara en inglés de 5–15 segundos y Dia leerá el guion con una voz parecida (solo en este Mac). Cuanto menos ruido y música, más se parece.",
+ "voice.file": "Grabación (mp3, m4a, wav…)",
+ "voice.name": "Nombre",
+ "voice.name_ph": "p. ej. Mi voz",
+ "voice.text": "Lo que se dice en la grabación (vacío: se transcribe solo)",
+ "voice.consent": "Es mi voz, o tengo permiso para usarla",
+ "voice.add": "Añadir voz",
+ "js.voice.mine": "Voces grabadas",
+ "js.voice.play": "Escuchar {name}",
+ "js.voice.del_confirm": "¿Eliminar esta voz? (También se borra la grabación.)",
+ "js.voice.need_file": "Elige una grabación",
+ "js.voice.need_consent": "Solo puedes añadir tu voz o una que tengas permiso para usar (marca la casilla)",
+ "js.voice.adding": "Añadiendo la voz… (la transcripción tarda un poco)",
+ "js.voice.added": "Voz añadida. Elígela en Narrador"
 }

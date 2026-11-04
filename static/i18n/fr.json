@@ -526,5 +526,20 @@
  "js.story.q_skipped": "Ignoré",
  "js.story.q_error": "Échec",
  "kc.cinema": "Cinéma",
- "kc.impact": "Impact"
+ "kc.impact": "Impact",
+ "voice.title": "Utiliser votre propre voix (à partir d'un enregistrement)",
+ "voice.hint": "Ajoutez un enregistrement clair en anglais de 5 à 15 secondes : Dia lira le script avec une voix proche (traité uniquement sur ce Mac). Moins il y a de bruit et de musique, plus c'est ressemblant.",
+ "voice.file": "Enregistrement (mp3, m4a, wav…)",
+ "voice.name": "Nom",
+ "voice.name_ph": "ex. Ma voix",
+ "voice.text": "Ce qui est dit dans l'enregistrement (vide : transcrit automatiquement)",
+ "voice.consent": "C'est ma voix, ou j'ai l'autorisation de l'utiliser",
+ "voice.add": "Ajouter la voix",
+ "js.voice.mine": "Voix enregistrées",
+ "js.voice.play": "Écouter {name}",
+ "js.voice.del_confirm": "Supprimer cette voix ? (L'enregistrement est aussi supprimé.)",
+ "js.voice.need_file": "Choisissez un enregistrement",
+ "js.voice.need_consent": "Seule votre voix ou une voix autorisée peut être ajoutée (cochez la case)",
+ "js.voice.adding": "Ajout de la voix… (la transcription prend un moment)",
+ "js.voice.added": "Voix ajoutée. Choisissez-la dans Narrateur"
 }

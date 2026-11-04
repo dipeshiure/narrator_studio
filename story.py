@@ -427,6 +427,22 @@ DIA_REFS = mv.TMP / "dia_refs"           # one reference clip per seed = the vid
 DIA_SETUP = ("uv venv --python 3.11 tools/dia_venv && "
              "uv pip install --python tools/dia_venv/bin/python mlx-audio librosa")
 DIA_VOICES = {33: "男性・低い", 21: "男性・落ち着いた", 64: "男性・やや高め"}
+MY_VOICES = mv.MEDIA / "voices"        # recorded voices: <id>.wav + <id>.json {name, text}
+
+
+def my_voice(vid):
+    """(wav, info) of a recorded voice, or None (also for ids that are not plain names)."""
+    if not vid or not re.fullmatch(r"[a-z0-9]{6,16}", str(vid)):
+        return None
+    wav, meta = MY_VOICES / f"{vid}.wav", MY_VOICES / f"{vid}.json"
+    if not (wav.exists() and meta.exists()):
+        return None
+    return wav, json.loads(meta.read_text())
+
+
+def voice_label(s):
+    mine = my_voice(s.get("dia_voice"))
+    return f"Dia {mine[1]['name']}" if mine else f"Dia seed {s.get('dia_seed', 33)}"
 
 
 def dia_available():
@@ -439,8 +455,12 @@ def dia_voice(scenes, wavs, s, log=print):
     todo = [(sc, w) for sc, w in zip(scenes, wavs) if not w.exists()]
     if todo:
         job = todo[0][1].parent / "dia_job.json"
-        mv.write_json(job, {"seed": int(s.get("dia_seed", 33)), "ref_dir": str(DIA_REFS),
-                            "items": [{"text": sc["text"], "out": str(w)} for sc, w in todo]})
+        spec = {"seed": int(s.get("dia_seed", 33)), "ref_dir": str(DIA_REFS),
+                "items": [{"text": sc["text"], "out": str(w)} for sc, w in todo]}
+        mine = my_voice(s.get("dia_voice"))
+        if mine:                                   # the user's recorded voice is the speaker
+            spec.update(ref_audio=str(mine[0]), ref_text=mine[1]["text"])
+        mv.write_json(job, spec)
         log(f"  ナレーションを作成中(Dia・この Mac で生成): {len(todo)} 段落")
         proc = subprocess.Popen([str(DIA_PY), str(DIA_BATCH), str(job)], cwd=HERE,
                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
@@ -738,7 +758,7 @@ def _make_story(script, outdir, s, log=print):
     scenes = data["scenes"]
     voice = data.get("voice") or s["voice"]
     log(f"== {data['title']}  ({len(scenes)} シーン, 声: "
-        f"{'Dia seed ' + str(s.get('dia_seed', 33)) if s['tts_engine'] == 'dia' else voice})")
+        f"{voice_label(s) if s['tts_engine'] == 'dia' else voice})")
 
     # 1. narration, one file per scene (cached by text+voice)
     parts, t, heads, chapters = [], 0.0, [], []
@@ -748,7 +768,9 @@ def _make_story(script, outdir, s, log=print):
     if engine == "dia" and not dia_available():
         log("  ! Dia の準備ができていないので、edge-tts の声で作ります")
         engine = "edge"
-    vkey = f"dia{s.get('dia_seed', 33)}" if engine == "dia" else voice + s["tts_rate"] + s.get("tts_pitch", "+0Hz")
+    mine = my_voice(s.get("dia_voice")) if engine == "dia" else None
+    vkey = (f"my{s['dia_voice']}{int(mine[0].stat().st_mtime)}" if mine else
+            f"dia{s.get('dia_seed', 33)}" if engine == "dia" else voice + s["tts_rate"] + s.get("tts_pitch", "+0Hz"))
     wavs = [work / f"v{i:03d}_{mv.hashlib.md5((vkey + sc['text']).encode()).hexdigest()[:10]}.wav"
             for i, sc in enumerate(scenes)]
     if engine == "dia":

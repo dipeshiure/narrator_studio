@@ -593,3 +593,9 @@ details.font-add { border: 1px solid var(--color-line); border-radius: var(--rad
 @media (max-width: 560px) { .segmented.seg-grid { grid-template-columns: repeat(2, 1fr); } }
 .font-sample[data-preset="cinema"] { font-size: 22px; color: #F5F1E8; }
 .font-sample[data-preset="impact"] { font-size: 30px; letter-spacing: .01em; }
+
+/* my voices (recorded Dia reference) */
+.my-voices { margin-top: 4px; }
+.voice-list { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 4px; }
+.voice-list li { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--color-line); }
+.voice-list .batch-title { flex: 1; }

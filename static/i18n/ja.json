@@ -532,5 +532,20 @@
  "js.story.q_skipped": "スキップ",
  "js.story.q_error": "失敗",
  "kc.cinema": "シネマ",
- "kc.impact": "インパクト"
+ "kc.impact": "インパクト",
+ "voice.title": "自分の声を使う(録音から)",
+ "voice.hint": "5〜15 秒くらい、はっきり話した英語の録音を入れると、Dia がその声に似せて台本を読みます(この Mac の中だけで処理)。雑音や音楽のない録音ほど似ます。",
+ "voice.file": "録音ファイル(mp3・m4a・wav など)",
+ "voice.name": "名前",
+ "voice.name_ph": "例: 自分の声",
+ "voice.text": "録音で話している内容(空欄なら自動で聞き取ります)",
+ "voice.consent": "自分の声、または使う許可をもらった人の声です",
+ "voice.add": "声を追加",
+ "js.voice.mine": "録音した声",
+ "js.voice.play": "{name} を聞く",
+ "js.voice.del_confirm": "この声を削除しますか?(録音ファイルも消えます)",
+ "js.voice.need_file": "録音ファイルを選んでください",
+ "js.voice.need_consent": "自分の声か、使う許可をもらった声だけ追加できます(チェックを入れてください)",
+ "js.voice.adding": "声を追加しています…(聞き取りに少しかかります)",
+ "js.voice.added": "声を追加しました。ナレーターで選べます"
 }

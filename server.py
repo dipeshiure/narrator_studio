@@ -517,7 +517,7 @@ STORY_PRESETS = {"bhatt": "長尺の語り(白黒イラスト)"}
 STORY_KEYS = {"voice", "tts_rate", "tts_pitch", "visuals", "aspect", "subs", "subs_engine", "kc_preset",
               "kc_font", "kc_size", "kc_position", "bgm", "bgm_mood", "bgm_volume",
               "hero", "image_seconds", "grain", "show_headings", "offline", "media_folder",
-              "tts_engine", "dia_seed", "kc_accent_font"}
+              "tts_engine", "dia_seed", "dia_voice", "kc_accent_font"}
 VOICE_SAMPLE = ("You were not built to quit. Every scar you carry is proof that you survived "
                 "what was meant to break you.")
 SIGNED = re.compile(r"^[+-]\d{1,3}(%|Hz)$")
@@ -561,6 +561,7 @@ def story_options():
         "kinetic_ready": mv.kinetic_available(), "kinetic_setup": mv.KC_SETUP,
         "dia_ready": story.dia_available(), "dia_setup": story.DIA_SETUP,
         "dia_voices": [{"seed": k, "label": v} for k, v in story.DIA_VOICES.items()],
+        "my_voices": voice_list(),
         "ai_ready": illustrate.available(), "ai_setup": illustrate.SETUP, "ai_downloading": downloading,
         "scripts": [script_info(p) for p in scripts[:100]],
     })
@@ -634,6 +635,20 @@ def dia_sample(body):
         seed = int(body.get("seed", 33))
     except (TypeError, ValueError):
         seed = 33
+    mine = story.my_voice(body.get("voice_id"))
+    if mine:                                   # a recorded voice: let Dia read the sample line with it
+        out = mv.TMP / "voice_samples" / f"my_{body['voice_id']}_{int(mine[0].stat().st_mtime)}.wav"
+        if not out.exists():
+            out.parent.mkdir(parents=True, exist_ok=True)
+            job = mv.TMP / f"dia_sample_my_{body['voice_id']}.json"
+            mv.write_json(job, {"seed": seed, "ref_dir": str(story.DIA_REFS), "ref_audio": str(mine[0]),
+                                "ref_text": mine[1]["text"], "items": [{"text": VOICE_SAMPLE, "out": str(out)}]})
+            r = subprocess.run([str(story.DIA_PY), str(story.DIA_BATCH), str(job)], cwd=HERE,
+                               capture_output=True, text=True)
+            job.unlink(missing_ok=True)
+            if not out.exists():
+                return jsonify({"error": "声を作れませんでした: " + (r.stderr or r.stdout)[-300:]}), 502
+        return send_file(out, mimetype="audio/wav")
     ref = story.DIA_REFS / f"dia_seed{seed}.wav"
     if not ref.exists():                       # first time: make the reference (~30 s)
         job = mv.TMP / f"dia_sample_{seed}.json"
@@ -644,6 +659,93 @@ def dia_sample(body):
         if not ref.exists():
             return jsonify({"error": "声を作れませんでした: " + (r.stderr or r.stdout)[-300:]}), 502
     return send_file(ref, mimetype="audio/wav")
+
+
+# ------------------------------------------------------------------ my voices (Dia reference)
+# A short recording of a voice the user may use (their own, or one they have permission for)
+# becomes the narrator: Dia gets it + its words as the prompt for every chunk.
+VOICE_MIN, VOICE_MAX = 3.0, 15.0          # seconds kept from the recording
+
+
+def voice_list():
+    import story
+    out = []
+    for meta in sorted(story.MY_VOICES.glob("*.json"), key=lambda p: p.stat().st_mtime):
+        vid = meta.stem
+        mine = story.my_voice(vid)
+        if mine:
+            out.append({"id": vid, "name": mine[1]["name"], "text": mine[1]["text"],
+                        "seconds": mine[1].get("seconds")})
+    return out
+
+
+@app.get("/api/story/voices")
+def story_voices():
+    return jsonify(voice_list())
+
+
+@app.post("/api/story/voices")
+def story_voice_add():
+    """multipart: file (any audio/video), name, text (optional: transcribed when empty),
+    consent=1 (the user confirms it is their voice or they may use it)."""
+    import story
+    f = request.files.get("file")
+    name = " ".join(str(request.form.get("name") or "").split())[:40]
+    text = " ".join(str(request.form.get("text") or "").split())[:400]
+    if not f or not f.filename:
+        return jsonify({"error": "録音ファイルを選んでください"}), 400
+    if request.form.get("consent") != "1":
+        return jsonify({"error": "自分の声か、使う許可をもらった声だけ追加できます"}), 400
+    vid = uuid.uuid4().hex[:10]
+    story.MY_VOICES.mkdir(parents=True, exist_ok=True)
+    raw = mv.TMP / f"voice_upload_{vid}{Path(f.filename).suffix.lower()[:6]}"
+    f.save(raw)
+    wav = story.MY_VOICES / f"{vid}.wav"
+    try:                                      # mono 44.1 kHz, silence trimmed, at most VOICE_MAX s
+        r = subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(raw), "-vn", "-ac", "1", "-ar", "44100",
+                            "-af", "silenceremove=start_periods=1:start_threshold=-45dB,loudnorm=I=-18",
+                            "-t", str(VOICE_MAX), str(wav)], capture_output=True, text=True)
+        if r.returncode or not wav.exists():
+            return jsonify({"error": "対応していない形式です"}), 400
+        secs = mv.duration(wav)
+        if secs < VOICE_MIN:
+            wav.unlink(missing_ok=True)
+            return jsonify({"error": f"録音が短すぎます({VOICE_MIN:.0f} 秒以上にしてください)"}), 400
+        if not text:                          # what is said in the clip: Whisper on this Mac
+            words = mv.transcribe(wav, mv.TMP / f"voice_{vid}.words.json", "small")
+            text = " ".join(w["w"].strip() for w in words).strip()
+            (mv.TMP / f"voice_{vid}.words.json").unlink(missing_ok=True)
+        if len(text.split()) < 3:
+            wav.unlink(missing_ok=True)
+            return jsonify({"error": "録音の中の言葉を聞き取れませんでした。話した内容を入力してください"}), 400
+        mv.write_json(story.MY_VOICES / f"{vid}.json",
+                      {"name": name or f"My voice {len(voice_list()) + 1}", "text": text,
+                       "seconds": round(secs, 1), "added": time.time()})
+    except Exception:
+        wav.unlink(missing_ok=True)             # nothing half-saved
+        raise
+    finally:
+        raw.unlink(missing_ok=True)
+    return jsonify({"id": vid, "voices": voice_list()})
+
+
+@app.get("/api/story/voices/<vid>/audio")
+def story_voice_audio(vid):
+    import story
+    mine = story.my_voice(vid)
+    if not mine:
+        abort(404)
+    return send_file(mine[0], mimetype="audio/wav")
+
+
+@app.post("/api/story/voices/<vid>/delete")
+def story_voice_delete(vid):
+    import story
+    if not story.my_voice(vid):
+        abort(404)
+    for p in (story.MY_VOICES / f"{vid}.wav", story.MY_VOICES / f"{vid}.json"):
+        p.unlink(missing_ok=True)
+    return jsonify({"voices": voice_list()})
 
 
 @app.post("/api/story/pick-folder")
