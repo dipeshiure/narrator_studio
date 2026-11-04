@@ -5,7 +5,7 @@
   const PRESETS = {
     bhatt: {
       hint: t('js.story.bhatt_hint'),
-      o: { tts: 'dia', dia_seed: 33, voice: 'en-US-ChristopherNeural', rate: -8, pitch: -4, visuals: 'ai', aspect: '16:9', grain: true,
+      o: { tts: 'dia', dia_seed: 33, voice: 'en-US-ChristopherNeural', speed: 0.92, pitch: -4, visuals: 'ai', aspect: '16:9', grain: true,
            headings: false, engine: 'kinetic', kc_preset: 'bhatt', kc_font: '', kc_accent_font: '', kc_size: 1.0,
            bgm: true, mood: 'dark' },
     },
@@ -16,6 +16,7 @@
 
   const saveState = () => saveUI({ story: { ...st } });
   const signed = (n, unit) => (n >= 0 ? '+' : '') + n + unit;
+  const ratePct = (speed) => signed(Math.round((speed - 1) * 100), '%');   // edge-tts wants a percentage
 
   // ------------------------------------------------------------ paint
   function seg(id, v) {
@@ -39,7 +40,7 @@
     else if (dia) { th.className = 'hint'; th.textContent = t('js.story.dia_hint'); }
     else { th.className = 'hint'; th.textContent = t('js.story.edge_hint'); }
 
-    $('#story-rate').value = o.rate; $('#o-story-rate').textContent = signed(o.rate, '%');
+    $('#story-rate').value = o.speed; $('#o-story-rate').textContent = o.speed.toFixed(2) + '×';
     $('#story-pitch').value = o.pitch; $('#o-story-pitch').textContent = signed(o.pitch, 'Hz');
     $('#story-kc-size').value = o.kc_size; $('#o-story-kc-size').textContent = Number(o.kc_size).toFixed(2) + '×';
     $('#story-kc-font').value = o.kc_font || '';
@@ -76,7 +77,7 @@
     const words = (body.match(/[A-Za-z0-9'$%.,-]+/g) || []).filter(w => /[A-Za-z0-9]/.test(w)).length;
     const paras = body.split(/\n\s*\n/).filter(p => p.trim()).length;
     const chapters = text.split('\n').filter(l => l.trim().startsWith('## ')).length;
-    const min = words / (150 * (1 + st.o.rate / 100));
+    const min = words / (150 * st.o.speed);
     $('#story-stats').textContent = words ? t('js.story.stats', { words: words.toLocaleString(), paras }) + (chapters ? ' · ' + t('js.story.chapters', { n: chapters }) : '') : '';
     const est = $('#story-estimate');
     if (!words) est.textContent = t('js.story.need_text');
@@ -192,6 +193,8 @@
              ...(PRESETS[saved.preset] ? {} : { preset: 'bhatt' }),
              ...(['bhatt', 'motivation'].includes(saved.style) ? {} : { style: 'bhatt' }),
              o: { ...PRESETS.bhatt.o, hero: '', ...(saved.o || {}) } };
+      if (typeof st.o.speed !== 'number') st.o.speed = Math.max(0.6, Math.min(1.4, 1 + (Number(st.o.rate) || 0) / 100));   // old % setting
+      delete st.o.rate;
       if (!['kinetic', 'simple', 'off'].includes(st.o.engine)) st.o.engine = 'kinetic';   // SubtitleFX was removed
       $('#story-title').value = st.title; $('#story-text').value = st.text;
       if (st.job) followRender(st.job);
@@ -234,7 +237,7 @@
   function fillDiaVoices(mine) {
     const dv = $('#story-dia-voice');
     if (st.o.dia_voice && !mine.some(v => v.id === st.o.dia_voice)) st.o.dia_voice = '';   // deleted
-    dv.innerHTML = (opts.dia_voices || []).map(x => `<option value="${x.seed}">Dia ${x.label}(seed ${x.seed})</option>`).join('')
+    dv.innerHTML = (opts.dia_voices || []).map(x => `<option value="${x.seed}">${x.name} — ${x.label}</option>`).join('')
       + (mine.length ? `<optgroup label="${esc(t('js.voice.mine'))}">` + mine.map(v =>
         `<option value="v:${v.id}">${esc(v.name)}</option>`).join('') + '</optgroup>' : '');
     $('#my-voice-list').innerHTML = mine.map(v => `<li>
@@ -268,7 +271,7 @@
     btn.disabled = false;
   });
   onSeg('story-tts', v => set('tts', v));
-  $('#story-rate').addEventListener('input', e => set('rate', Number(e.target.value)));
+  $('#story-rate').addEventListener('input', e => set('speed', Math.round(Number(e.target.value) * 100) / 100));
   $('#story-pitch').addEventListener('input', e => set('pitch', Number(e.target.value)));
   $('#story-kc-size').addEventListener('input', e => set('kc_size', Number(e.target.value)));
   $('#story-kc-font').addEventListener('change', e => set('kc_font', e.target.value));
@@ -372,7 +375,7 @@
     try {
       const res = await fetch('/api/story/voice-sample', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ engine: st.o.tts === 'dia' ? 'dia' : 'edge', seed: st.o.dia_seed || 33, voice_id: st.o.dia_voice || '',
-                               voice: st.o.voice, rate: signed(st.o.rate, '%'), pitch: signed(st.o.pitch, 'Hz') }) });
+                               voice: st.o.voice, rate: ratePct(st.o.speed), pitch: signed(st.o.pitch, 'Hz') }) });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
       const a = $('#story-voice-audio'); a.src = URL.createObjectURL(await res.blob()); await a.play();
     } catch (e) { toast(e.message); }
@@ -402,7 +405,7 @@
   // the 仕上がり panel as server options — shared by "動画を作る" and the batch
   function storyOptions() {
     const o = st.o;
-    return { tts_engine: o.tts === 'dia' ? 'dia' : 'edge', dia_seed: o.dia_seed || 33, dia_voice: o.dia_voice || '', voice: o.voice, tts_rate: signed(o.rate, '%'), tts_pitch: signed(o.pitch, 'Hz'),
+    return { tts_engine: o.tts === 'dia' ? 'dia' : 'edge', dia_seed: o.dia_seed || 33, dia_voice: o.dia_voice || '', voice: o.voice, tts_rate: ratePct(o.speed), tts_speed: o.speed, tts_pitch: signed(o.pitch, 'Hz'),
              visuals: o.visuals, hero: o.hero || '', media_folder: o.media_folder || '', aspect: o.aspect, grain: o.grain,
              show_headings: o.headings, subs: o.engine !== 'off',
              subs_engine: o.engine === 'off' ? 'simple' : o.engine,
@@ -441,7 +444,7 @@
     try {
       const { job } = await api('/api/story/match-preview', { method: 'POST', body: {
         text: $('#story-text').value, preset: st.preset,
-        options: { media_folder: st.o.media_folder, tts_rate: signed(st.o.rate, '%') } } });
+        options: { media_folder: st.o.media_folder, tts_rate: ratePct(st.o.speed) } } });
       const tick = async () => {
         const j = await api('/api/jobs/' + job);
         const last = [...j.log].reverse().find(l => l.trim());

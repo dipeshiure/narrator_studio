@@ -52,6 +52,7 @@ STORY_DEFAULTS = {
     "dia_seed": 33,                  # dia: which invented speaker (33 / 21 / 64 are male voices)
     "voice": "en-US-GuyNeural",
     "tts_rate": "+0%",
+    "tts_speed": 1.0,                # speaking speed as a multiplier (1.0 = normal): edge rate and Dia tempo
     "tts_pitch": "+0Hz",             # lower = deeper voice, e.g. "-6Hz"
     "visuals": "stock",              # stock (Pexels) / ai (ink illustrations, illustrate.py) / folder (your own media)
     "media_folder": "",              # folder: your clips / photos, matched to each paragraph by meaning (media_match.py)
@@ -427,6 +428,7 @@ DIA_REFS = mv.TMP / "dia_refs"           # one reference clip per seed = the vid
 DIA_SETUP = ("uv venv --python 3.11 tools/dia_venv && "
              "uv pip install --python tools/dia_venv/bin/python mlx-audio librosa")
 DIA_VOICES = {33: "男性・低い", 21: "男性・落ち着いた", 64: "男性・やや高め"}
+DIA_NAMES = {33: "Atlas", 21: "Orion", 64: "Sage"}      # the built-in speakers are picked by name
 MY_VOICES = mv.MEDIA / "voices"        # recorded voices: <id>.wav + <id>.json {name, text}
 
 
@@ -442,7 +444,7 @@ def my_voice(vid):
 
 def voice_label(s):
     mine = my_voice(s.get("dia_voice"))
-    return f"Dia {mine[1]['name']}" if mine else f"Dia seed {s.get('dia_seed', 33)}"
+    return f"Dia {mine[1]['name']}" if mine else f"Dia {DIA_NAMES.get(int(s.get('dia_seed', 33)), s.get('dia_seed', 33))}"
 
 
 def dia_available():
@@ -455,7 +457,7 @@ def dia_voice(scenes, wavs, s, log=print):
     todo = [(sc, w) for sc, w in zip(scenes, wavs) if not w.exists()]
     if todo:
         job = todo[0][1].parent / "dia_job.json"
-        spec = {"seed": int(s.get("dia_seed", 33)), "ref_dir": str(DIA_REFS),
+        spec = {"seed": int(s.get("dia_seed", 33)), "ref_dir": str(DIA_REFS), "speed": float(s.get("tts_speed", 1.0)),
                 "items": [{"text": sc["text"], "out": str(w)} for sc, w in todo]}
         mine = my_voice(s.get("dia_voice"))
         if mine:                                   # the user's recorded voice is the speaker
@@ -770,7 +772,7 @@ def _make_story(script, outdir, s, log=print):
         engine = "edge"
     mine = my_voice(s.get("dia_voice")) if engine == "dia" else None
     vkey = (f"my{s['dia_voice']}{int(mine[0].stat().st_mtime)}" if mine else
-            f"dia{s.get('dia_seed', 33)}" if engine == "dia" else voice + s["tts_rate"] + s.get("tts_pitch", "+0Hz"))
+            f"dia{s.get('dia_seed', 33)}{'' if abs(float(s.get('tts_speed', 1)) - 1) < .01 else 's%.2f' % float(s['tts_speed'])}" if engine == "dia" else voice + s["tts_rate"] + s.get("tts_pitch", "+0Hz"))
     wavs = [work / f"v{i:03d}_{mv.hashlib.md5((vkey + sc['text']).encode()).hexdigest()[:10]}.wav"
             for i, sc in enumerate(scenes)]
     if engine == "dia":

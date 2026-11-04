@@ -15,7 +15,7 @@
       window.applyTheme = apply; apply(); mq.addEventListener('change', apply);
     })();
   </script>
-  <link rel="stylesheet" href="/static/styles.css?v=20261104d">
+  <link rel="stylesheet" href="/static/styles.css?v=20261104e">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -386,7 +386,7 @@
                   <div class="row" style="justify-content:flex-end"><button class="btn btn-sm" id="my-voice-add"><svg width="16" height="16" aria-hidden="true"><use href="#i-upload"/></svg><span data-i18n="voice.add">声を追加</span></button></div>
                 </div></details>
               <div class="field"><div class="range-head"><label for="story-rate" data-i18n="story.54">話す速さ</label><output id="o-story-rate"></output></div>
-                <input type="range" id="story-rate" min="-25" max="20" step="1"></div>
+                <input type="range" id="story-rate" min="0.6" max="1.4" step="0.05"></div>
               <div class="field story-edge"><div class="range-head"><label for="story-pitch" data-i18n="story.55">声の高さ</label><output id="o-story-pitch"></output></div>
                 <input type="range" id="story-pitch" min="-15" max="10" step="1"></div>
             </div></details>
@@ -635,12 +635,12 @@
   <div class="modal-body" id="post-modal-body"></div>
 </dialog>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
-<script src="/static/i18n.js?v=20261104d"></script>
-<script src="/static/app.js?v=20261104d"></script>
-<script src="/static/inbox.js?v=20261104d"></script>
-<script src="/static/posts.js?v=20261104d"></script>
-<script src="/static/rights.js?v=20261104d"></script>
-<script src="/static/story.js?v=20261104d"></script>
-<script src="/static/fonts.js?v=20261104d"></script>
+<script src="/static/i18n.js?v=20261104e"></script>
+<script src="/static/app.js?v=20261104e"></script>
+<script src="/static/inbox.js?v=20261104e"></script>
+<script src="/static/posts.js?v=20261104e"></script>
+<script src="/static/rights.js?v=20261104e"></script>
+<script src="/static/story.js?v=20261104e"></script>
+<script src="/static/fonts.js?v=20261104e"></script>
 </body>
 </html>

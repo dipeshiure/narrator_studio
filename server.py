@@ -517,7 +517,7 @@ STORY_PRESETS = {"bhatt": "長尺の語り(白黒イラスト)"}
 STORY_KEYS = {"voice", "tts_rate", "tts_pitch", "visuals", "aspect", "subs", "subs_engine", "kc_preset",
               "kc_font", "kc_size", "kc_position", "bgm", "bgm_mood", "bgm_volume",
               "hero", "image_seconds", "grain", "show_headings", "offline", "media_folder",
-              "tts_engine", "dia_seed", "dia_voice", "kc_accent_font"}
+              "tts_engine", "dia_seed", "dia_voice", "kc_accent_font", "tts_speed"}
 VOICE_SAMPLE = ("You were not built to quit. Every scar you carry is proof that you survived "
                 "what was meant to break you.")
 SIGNED = re.compile(r"^[+-]\d{1,3}(%|Hz)$")
@@ -536,6 +536,10 @@ def story_settings(body):
             s[k] = story.STORY_DEFAULTS[k]
     if s.get("tts_engine") not in ("edge", "dia", "say"):
         s["tts_engine"] = "edge"
+    try:
+        s["tts_speed"] = max(0.5, min(1.5, float(s.get("tts_speed", 1.0))))
+    except (TypeError, ValueError):
+        s["tts_speed"] = 1.0
     try:
         s["dia_seed"] = int(s.get("dia_seed", 33))
     except (TypeError, ValueError):
@@ -560,7 +564,7 @@ def story_options():
         "defaults": {k: v for k, v in story_settings({"preset": "bhatt"})[1].items() if k in STORY_KEYS},
         "kinetic_ready": mv.kinetic_available(), "kinetic_setup": mv.KC_SETUP,
         "dia_ready": story.dia_available(), "dia_setup": story.DIA_SETUP,
-        "dia_voices": [{"seed": k, "label": v} for k, v in story.DIA_VOICES.items()],
+        "dia_voices": [{"seed": k, "name": story.DIA_NAMES[k], "label": v} for k, v in story.DIA_VOICES.items()],
         "my_voices": voice_list(),
         "ai_ready": illustrate.available(), "ai_setup": illustrate.SETUP, "ai_downloading": downloading,
         "scripts": [script_info(p) for p in scripts[:100]],

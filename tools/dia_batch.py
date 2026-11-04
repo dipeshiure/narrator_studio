@@ -43,9 +43,9 @@ REF_TEXT = ("Every man reaches a point where nobody claps for him anymore. "
             "Nobody checks on him. And that is exactly where his real life begins.")
 MAX_WORDS = 24          # per chunk (~6-9 s of speech)
 WPS = 2.5               # target words per second (calm narration)
-MAX_DRIFT = 0.35        # allowed |log2(chunk pitch / reference pitch)| (~27 %): a male->female flip is ~0.8
-TRIES = 3
-TEMPERATURE = 1.1       # Dia's default 1.3 wanders between speakers; lower = steadier voice, fewer redos
+MAX_DRIFT = 0.18        # allowed |log2(chunk pitch / reference pitch)| (~13 %): same speaker stays well inside, a male->female flip is ~0.8
+TRIES = 5
+TEMPERATURE = 1.0       # Dia's default 1.3 wanders between speakers; lower = steadier voice, fewer redos
 TOKENS_PER_SEC = 86     # Dia's audio frame rate
 MAX_SECS_PER_WORD = 0.5 # cap the generation length (Dia sometimes runs on with noise)
 PAUSE = 0.25            # silence between chunks of one paragraph (s)
@@ -113,6 +113,7 @@ def main(path):
     print(f"TTS {len(items) - len(todo)} {len(items)}", flush=True)
     ref_dir = Path(job["ref_dir"]); ref_dir.mkdir(parents=True, exist_ok=True)
     ref_text = job.get("ref_text") or REF_TEXT
+    speed = max(0.5, min(2.0, float(job.get("speed", 1.0))))   # 1.0 = Dia's own pace
     ref = Path(job["ref_audio"]) if job.get("ref_audio") else ref_dir / f"dia_seed{seed}.wav"
     if not todo and ref.exists():
         return 0
@@ -164,7 +165,8 @@ def main(path):
             lst.write_text("".join(f"file '{p}'\n" for p in seq))
             part = out.with_name(out.stem + ".part.wav")
             subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", str(lst),
-                            "-af", "loudnorm=I=-18", "-ar", "44100", "-ac", "1", str(part)], check=True)
+                            "-af", "loudnorm=I=-18" + (f",atempo={speed:.3f}" if abs(speed - 1) > 0.01 else ""),
+                            "-ar", "44100", "-ac", "1", str(part)], check=True)
             part.replace(out)
             out.with_suffix(".heard.json").write_text(json.dumps(heard(stt, out, words=True)))
             for p in parts:
