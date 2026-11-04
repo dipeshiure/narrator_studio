@@ -30,9 +30,9 @@ def volume(path, start=None, dur=None):
     return float(next(l for l in err.splitlines() if "mean_volume" in l).split(":")[1].split()[0])
 
 
-def test_default_voice_only_subtitlefx_16x9(sandbox, assets):
+def test_voice_only_simple_subs_16x9(sandbox, assets):
     audio = sandbox["root"] / "speech.mp3"; shutil.copy(assets["speech"], audio)
-    out, log, s = render(sandbox, assets, audio)
+    out, log, s = render(sandbox, assets, audio, subs_engine="simple")
     assert out and out.exists(), log
     dur, w, h, has_audio = probe(out)
     assert (w, h) == (1920, 1080) and has_audio
@@ -40,7 +40,7 @@ def test_default_voice_only_subtitlefx_16x9(sandbox, assets):
     wd = work_dir(audio)
     assert (wd / "voice.wav").exists()                       # music removed
     ass = (wd / "subs.ass").read_text()
-    assert "Highlight" in ass and ass.count("Dialogue:") > 3  # SubtitleFX captions
+    assert ass.count("Dialogue:") > 3                         # burned-in captions
     assert len(mv.used_pool()) == len(list(wd.glob("*.mp4"))) or True
     assert len(mv.library_pool()) < 30                        # clips were moved to used/
     assert not list(wd.glob("0*.mp4"))                        # shot segments cleaned up

@@ -116,10 +116,7 @@ function paintSettings() {
   });
   $$('#settings [data-seg]').forEach(g => $$('button', g).forEach(b =>
     b.setAttribute('aria-pressed', String(b.dataset.v) === String(S[g.dataset.seg]))));
-  const fx = S.subs_engine === 'subtitlefx', kc = S.subs_engine === 'kinetic';
-  $$('[data-seg="sub_type"] button, [data-key="appear"], #r-char_max, #r-sub_fade_ms')
-    .forEach(el => el.disabled = !fx || !S.subs);
-  $$('[data-key="highlight"], [data-key="highlight_color"]').forEach(el => el.disabled = kc || !fx || !S.subs);
+  const kc = S.subs_engine === 'kinetic';
   // kinetic-captions decides size / colour / motion per word: only its own knobs apply
   $$('#settings .kc-only').forEach(el => el.hidden = !kc);
   $$('#settings .ass-only').forEach(el => el.hidden = kc);
@@ -132,8 +129,8 @@ function paintPreview() {
   p.classList.toggle('portrait', S.aspect === '9:16');
   if (!S.subs) { c.innerHTML = ''; return; }
   const words = ['never', 'give', 'up', 'on', 'yourself'];
-  const shown = S.sub_type === 'one_word' ? ['give'] : S.sub_type === 'joined' ? words.slice(0, 3) : words;
-  const hl = S.subs_engine === 'subtitlefx' && S.highlight;
+  const shown = words;
+  const hl = false;
   c.classList.toggle('kinetic', S.subs_engine === 'kinetic');
   c.innerHTML = shown.map(w => {
     const t = S.uppercase ? w.toUpperCase() : w;

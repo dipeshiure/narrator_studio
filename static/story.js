@@ -191,6 +191,7 @@
              ...(PRESETS[saved.preset] ? {} : { preset: 'bhatt' }),
              ...(['bhatt', 'motivation'].includes(saved.style) ? {} : { style: 'bhatt' }),
              o: { ...PRESETS.bhatt.o, hero: '', ...(saved.o || {}) } };
+      if (!['kinetic', 'simple', 'off'].includes(st.o.engine)) st.o.engine = 'kinetic';   // SubtitleFX was removed
       $('#story-title').value = st.title; $('#story-text').value = st.text;
       if (st.job) followRender(st.job);
     }

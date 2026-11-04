@@ -880,8 +880,7 @@ def _make_story(script, outdir, s, log=print):
                 mv.write_simple_ass(words, work / "subs_plain.ass", s)
                 mv.write_simple_ass([], ass, s)
             else:
-                (mv.write_subtitlefx_ass if s["subs_engine"] == "subtitlefx" else mv.write_simple_ass)(
-                    words, ass, s, *([total] if s["subs_engine"] == "subtitlefx" else []))
+                mv.write_simple_ass(words, ass, s)
         else:
             mv.write_simple_ass([], ass, s)
         add_headings(ass, heads, s, credits)

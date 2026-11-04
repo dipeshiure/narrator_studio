@@ -29,4 +29,4 @@
 
 ## プログラム（触らなくて大丈夫）
 
-`server.py`（画面とAPI）、`story.py`（台本→動画）、`make_video.py`（音声→動画）、`prep.py`・`illustrate.py`・`media_match.py`・`music.py`・`thumbs.py`・`commons.py`・`publish_meta.py`・`qa.py`・`rights.py`・`make_posting.py`、`static/`（画面）、`tests/`、`kinetic_captions/`・`SubtitleFX-src/`（字幕エンジン）、`venv/`（Python の環境）、`logs/`・`tmp/`（作業用）
+`server.py`（画面とAPI）、`story.py`（台本→動画）、`make_video.py`（音声→動画）、`prep.py`・`illustrate.py`・`media_match.py`・`music.py`・`thumbs.py`・`commons.py`・`publish_meta.py`・`qa.py`・`rights.py`・`make_posting.py`、`static/`（画面）、`tests/`、`kinetic_captions/`（字幕エンジン）、`venv/`（Python の環境）、`logs/`・`tmp/`（作業用）

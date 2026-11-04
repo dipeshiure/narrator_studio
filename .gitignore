@@ -16,5 +16,4 @@ __pycache__/
 .pytest_cache/
 logs/
 venv/
-SubtitleFX-src/
 tools/bench/work/

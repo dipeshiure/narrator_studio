@@ -2,7 +2,7 @@
 """Motiversity-style video generator.
 
 Speech MP3 -> cinematic stock-footage montage (Pexels) with colour grade,
-vignette, fast cuts, fades and burned-in subtitles (simple, SubtitleFX or kinetic-captions).
+vignette, fast cuts, fades and burned-in subtitles (kinetic-captions or simple).
 Each video takes fresh clips from 素材/stock/ and moves them to 素材/stock_used/;
 missing clips are downloaded from Pexels on demand, so clips are not reused.
 All look/feel options live in settings.json (edit them in the web UI: app.py).
@@ -77,14 +77,13 @@ DEFAULTS = {
     "llm_model": "qwen2.5:7b-instruct",
     # subtitles
     "subs": True,
-    "subs_engine": "subtitlefx", # "subtitlefx", "simple" or "kinetic" (kinetic_captions/)
+    "subs_engine": "kinetic",    # "kinetic" (kinetic_captions/) or "simple"
     # kinetic-captions: per-word size / colour / animation decided by the word itself
     "kc_preset": "motiversity",  # bhatt / motiversity / hormozi / clean
     "kc_font": "",               # "" = the 演出's own font; any id from kinetic_captions fonts (incl. Google Fonts)
     "kc_accent_font": "",        # bhatt: font of the key word ("" = Instrument Serif Italic)
     "kc_size": 1.0,              # text size multiplier (0.6 .. 1.6)
     "kc_position": "auto",       # auto / center / lower / top
-    "sub_type": "joined",        # SubtitleFX: one_word / joined / sentence
     "char_max": 22,
     "font": "Impact", "font_size": 78, "uppercase": True,
     "color": "FFFFFF", "outline": 4, "outline_color": "000000", "shadow": 2,
@@ -125,7 +124,10 @@ def write_json(path, data):
 def load_settings(path=None):
     """Defaults, overlaid with the saved settings (unknown keys are ignored)."""
     saved = read_json(path or SETTINGS, {})
-    return {**DEFAULTS, **{k: v for k, v in saved.items() if k in DEFAULTS}}
+    s = {**DEFAULTS, **{k: v for k, v in saved.items() if k in DEFAULTS}}
+    if s["subs_engine"] not in ("kinetic", "simple"):   # SubtitleFX was removed (2026-11-04)
+        s["subs_engine"] = "kinetic"
+    return s
 
 
 def save_settings(s, path=None):
@@ -439,44 +441,6 @@ def write_simple_ass(words, path, s, max_words=5):
         + "\n".join(lines) + "\n")
 
 
-def write_subtitlefx_ass(words, path, s, total):
-    """Styled captions via SubtitleFX (word highlight, fade, appear)."""
-    import pysubs2
-    from SubtitleFX import Config, SubtitleBuild, Style, Formatters
-    # SubtitleFX's formatters expect one event per word (like its own Whisper output)
-    transcript = pysubs2.SSAFile()
-    for w in words:
-        text = ass_safe(w["w"].upper() if s["uppercase"] else w["w"])
-        if text:
-            transcript.append(pysubs2.SSAEvent(start=int(w["s"] * 1000), end=int(w["e"] * 1000), text=text))
-    if not transcript.events:      # no speech found: SubtitleFX can't build an empty file
-        write_simple_ass([], path, s)
-        return
-    main = Style(fontname=s["font"], fontsize=s["font_size"], primarycolor=s["color"],
-                 outlinecolor=s["outline_color"], outline=s["outline"], shadow=s["shadow"])
-    conf = Config(
-        input=transcript, output=str(path), resolution=frame_size(s), duration=total,
-        subtitle_type=getattr(Formatters, s["sub_type"]), char_max=s["char_max"], subtitle_style=main,
-        fill_sub_times=False, alignment=s["alignment"],
-        fade=(s["sub_fade_ms"], s["sub_fade_ms"]), appear=s["appear"],
-        highlight_char_max=0 if s["highlight"] else None,
-        highlight_style=Style(primarycolor=s["highlight_color"]) if s["highlight"] else None,
-    )
-    with SubtitleBuild(conf) as build:
-        build.run()
-        build.save()
-    # bottom margin is not exposed by SubtitleFX; set it on every style
-    txt = path.read_text()
-    out = []
-    for line in txt.splitlines():
-        if line.startswith("Style:"):
-            parts = line.split(",")
-            parts[-2] = str(s["margin_v"])
-            line = ",".join(parts)
-        out.append(line)
-    path.write_text("\n".join(out) + "\n")
-
-
 KC_DIR = HERE / "kinetic_captions"
 KC_PY = KC_DIR / ".venv" / "bin" / "python"
 KC_SETUP = "uv venv --python 3.11 kinetic_captions/.venv && uv pip install --python kinetic_captions/.venv/bin/python -r kinetic_captions/requirements.txt"
@@ -684,10 +648,7 @@ def _make(mp3, out, s, log):
     kinetic = s["subs"] and s["subs_engine"] == "kinetic"
     if s["subs"]:
         ass = work / "subs.ass"
-        if s["subs_engine"] == "subtitlefx":
-            write_subtitlefx_ass(words, ass, s, total)
-        else:                 # kinetic: plain captions as the QA record, not burned in
-            write_simple_ass(words, ass, s)
+        write_simple_ass(words, ass, s)   # kinetic: plain captions as the QA record, not burned in
         if not kinetic:
             vf += f",ass={ass}"
 

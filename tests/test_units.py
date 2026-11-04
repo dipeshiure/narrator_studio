@@ -161,28 +161,13 @@ def test_simple_ass(sandbox, tmp_path, aspect, res):
     assert ",8,120,120," in t                                           # alignment applied
 
 
-@pytest.mark.parametrize("sub_type", ["one_word", "joined", "sentence"])
-@pytest.mark.parametrize("highlight", [True, False])
-def test_subtitlefx_ass(sandbox, tmp_path, sub_type, highlight):
-    s = {**mv.load_settings(), "sub_type": sub_type, "highlight": highlight, "margin_v": 222}
-    p = tmp_path / "fx.ass"
-    mv.write_subtitlefx_ass(WORDS, p, s, total=10.0)
-    t = p.read_text()
-    dialogues = [l for l in t.splitlines() if l.startswith("Dialogue")]
-    assert dialogues
-    assert ("Highlight" in t) == highlight
-    assert all(l.split(",")[-2] == "222" for l in t.splitlines() if l.startswith("Style:"))
-    visible = [re.sub(r"\{[^}]*\}", "", d.split(",,", 1)[1]) for d in dialogues]
-    assert all(v.strip() for v in visible)                  # no caption swallowed by markup
-    assert any("BRACES" in v for v in visible)              # '{braces}' word kept as text
-    if sub_type == "one_word":
-        assert all(len(v.split()) == 1 for v in visible)
-
-
-def test_subtitlefx_handles_empty_transcript(sandbox, tmp_path):
-    p = tmp_path / "empty.ass"
-    mv.write_subtitlefx_ass([], p, mv.load_settings(), total=5.0)
-    assert p.exists()
+def test_old_subtitlefx_setting_becomes_kinetic(sandbox, tmp_path):
+    p = tmp_path / "settings.json"
+    mv.write_json(p, {"subs_engine": "subtitlefx"})          # SubtitleFX was removed
+    assert mv.load_settings(p)["subs_engine"] == "kinetic"
+    mv.write_json(p, {"subs_engine": "simple"})
+    assert mv.load_settings(p)["subs_engine"] == "simple"
+    assert not hasattr(mv, "write_subtitlefx_ass")
 
 
 # ---------------------------------------------------------------- posting folders
