@@ -56,7 +56,10 @@ STORY_DEFAULTS = {
     "tts_pitch": "+0Hz",             # lower = deeper voice, e.g. "-6Hz"
     "visuals": "stock",              # stock (Pexels) / ai (ink illustrations, illustrate.py) / folder (your own media)
     "media_folder": "",              # folder: your clips / photos, matched to each paragraph by meaning (media_match.py)
-    "image_seconds": 9.0,            # ai: one illustration per this many seconds of narration
+    "image_seconds": 9.0,            # ai: one illustration per this many seconds of narration (later in the video)
+    "hook_seconds": 3.0,             # ai: ...but this often at the start (attention)
+    "hook_until": 45.0,              # ai: fast cuts last this many seconds
+    "hook_ramp": 120.0,              # ai: then relax to image_seconds over this many seconds
     "image_steps": 2,                # ai: FLUX.1-schnell steps (2 looks the same as 4 here, 1.5x faster)
     "image_model": "klein",          # ai: klein (FLUX.2 klein 4B, default) / schnell (FLUX.1-schnell)
     "hero": "",                      # ai: recurring main character ("" = illustrate.HERO)

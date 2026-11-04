@@ -162,3 +162,12 @@ def test_trim_bands_cuts_bars_not_negative_space(tmp_path):
     # 3) a full picture is left alone
     Image.fromarray(art(960, 544)).save(tmp_path / "full.png")
     assert illustrate.trim_bands(tmp_path / "full.png", tmp_path / "o3.png") == tmp_path / "full.png"
+
+
+def test_ai_pictures_cut_faster_at_the_start():
+    import illustrate
+    s = {"image_seconds": 9.0}
+    assert illustrate.shot_seconds(0, s) == illustrate.shot_seconds(40, s) == 3.0       # hook
+    assert 3.0 < illustrate.shot_seconds(100, s) < 9.0                                  # relaxing
+    assert illustrate.shot_seconds(400, s) == 9.0                                       # steady
+    assert illustrate.shot_seconds(0, {"image_seconds": 2.0}) == 2.0                    # never slower than the base

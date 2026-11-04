@@ -186,17 +186,30 @@ def size_for(s):
     return (544, 960) if s["aspect"] == "9:16" else (960, 544)
 
 
+def shot_seconds(t, s):
+    """How long one picture stays on screen at narration time t. The opening needs attention,
+    so it cuts fast (s['hook_seconds'] per picture for the first s['hook_until'] s), then the
+    cuts relax linearly to s['image_seconds'] over the next s['hook_ramp'] s."""
+    slow = float(s.get("image_seconds", 9.0))
+    fast = min(slow, float(s.get("hook_seconds", 3.0)))
+    until, ramp = float(s.get("hook_until", 45.0)), max(1.0, float(s.get("hook_ramp", 120.0)))
+    if t <= until:
+        return fast
+    return fast + (slow - fast) * min(1.0, (t - until) / ramp)
+
+
 def illustrate(scenes, s, log=print):
     """Draw every scene's images. Returns {scene index: [png, ...]} (missing on failure).
     One image per ~s['image_seconds'] of narration, each a different camera shot."""
     plan(scenes, s, log)
     w, h = size_for(s)
-    every = float(s.get("image_seconds", 9.0))
     family, _, _ = engine(s)
     name = KLEIN if family == "flux2" else MODEL     # cache per model: never reuse the other's images
     images, per_scene = [], {}
+    t0 = 0.0
     for i, sc in enumerate(scenes):
-        n = max(1, round(sc["dur"] / every))
+        n = max(1, round(sc["dur"] / shot_seconds(t0 + sc["dur"] / 2, s)))   # faster cuts near the start
+        t0 += sc["dur"] + 0.35
         for k in range(n):
             shot = SHOTS[(i + k) % len(SHOTS)] if n > 1 or i % 2 else SHOTS[0]
             prompt = f"{sc['image_prompt']}, {shot}, {STYLE}"
