@@ -1,0 +1,4 @@
+# kinetic_captions inside motiversity_auto: captions only (word timings come from
+# motiversity_auto, no transcription, no person detection). ffmpeg must be on PATH.
+numpy>=2
+pillow>=11

@@ -1,0 +1,43 @@
+{
+  "title": "How Costco Makes Money Without Making Money on Products",
+  "thumbnail": "THEY DON'T PROFIT ON PRODUCTS",
+  "description": "Costco sells hundreds of billions of dollars of goods every year, yet most of its profit comes from something else entirely. Here's how the membership model really works.\n\n(SAMPLE SCRIPT for testing the pipeline: verify every number against Costco's latest annual report before publishing.)",
+  "tags": ["costco", "business explained", "membership model", "retail"],
+  "sources": ["https://investor.costco.com/financial-information/annual-reports/"],
+  "scenes": [
+    {
+      "heading": "The Paradox",
+      "text": "Costco is one of the largest retailers on the planet. In fiscal 2024 it brought in over two hundred and fifty billion dollars in revenue. But here's the strange part: it barely makes money on the products it sells.",
+      "query": "warehouse store shopping"
+    },
+    {
+      "text": "The company caps its markup on most items at around fourteen to fifteen percent. A typical supermarket marks things up far more than that.",
+      "query": "supermarket shelves"
+    },
+    {
+      "heading": "The Real Business",
+      "text": "So where does the profit come from? Membership fees. Every member pays just to walk through the door, and that money is almost pure profit.",
+      "query": "credit card payment"
+    },
+    {
+      "text": "And those fees keep climbing. Membership fee income grew from about three point five billion dollars in 2020 to roughly four point eight billion in 2024.",
+      "chart": {
+        "type": "bar",
+        "title": "Costco membership fee income",
+        "labels": ["FY2020", "FY2021", "FY2022", "FY2023", "FY2024"],
+        "values": [3.54, 3.88, 4.22, 4.58, 4.83],
+        "unit": "$B",
+        "source": "Costco annual reports"
+      }
+    },
+    {
+      "heading": "Why It Works",
+      "text": "Because the fees cover so much of the profit, Costco can keep prices low. Low prices bring members back, and loyal members renew year after year.",
+      "query": "people shopping cart"
+    },
+    {
+      "text": "It's a flywheel. The cheaper the products, the more valuable the membership. And the more valuable the membership, the less Costco needs to earn on what it sells.",
+      "query": "delivery truck highway"
+    }
+  ]
+}

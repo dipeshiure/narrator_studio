@@ -1,0 +1,56 @@
+{
+  "title": "WTF Happened to Blockbuster?",
+  "thumbnail": "THEY LAUGHED AT NETFLIX",
+  "description": "In 2004 Blockbuster had around nine thousand stores. Today there is one. Here's how the king of movie rentals lost everything.\n\n(TEST VIDEO: numbers are rounded; verify before publishing.)",
+  "tags": [
+    "blockbuster",
+    "netflix",
+    "business explained",
+    "rise and fall"
+  ],
+  "sources": [
+    "https://en.wikipedia.org/wiki/Blockbuster_(retailer)",
+    "https://commons.wikimedia.org/"
+  ],
+  "scenes": [
+    {
+      "heading": "The King",
+      "text": "In 2004, Blockbuster was everywhere. It had around nine thousand stores, and Friday night meant one thing for millions of families: a trip to pick up a movie.",
+      "photo": "Blockbuster video store"
+    },
+    {
+      "text": "But a big part of its profit came from something customers hated. Late fees. Return a movie a day late, and you paid for it."
+    },
+    {
+      "heading": "The Mistake",
+      "text": "In 2000, a tiny startup called Netflix offered to sell itself to Blockbuster for fifty million dollars. Blockbuster's leadership reportedly turned the offer down.",
+      "query": "business meeting boardroom"
+    },
+    {
+      "text": "Netflix mailed DVDs with no late fees, then moved to streaming. Blockbuster was slow to follow, and its stores started to disappear.",
+      "chart": {
+        "type": "bar",
+        "title": "Blockbuster stores (approx.)",
+        "labels": [
+          "2004",
+          "2010",
+          "2014",
+          "Today"
+        ],
+        "values": [
+          9000,
+          3000,
+          300,
+          1
+        ],
+        "unit": "",
+        "source": "news reports, rounded"
+      }
+    },
+    {
+      "heading": "The Lesson",
+      "text": "In 2010, Blockbuster filed for bankruptcy. Today, just one store remains, in Bend, Oregon. The lesson? The business that is winning today can be the one that refuses to change tomorrow.",
+      "photo": "Blockbuster Bend Oregon"
+    }
+  ]
+}

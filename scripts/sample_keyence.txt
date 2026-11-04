@@ -1,0 +1,12 @@
+The Japanese Company With a 50% Profit Margin Nobody Talks About
+
+## The Strangest Company in Japan
+Most Americans have never heard of Keyence. Yet for years it has been one of the most valuable companies in Japan. [[entity:Keyence]]
+
+Its operating margin is around fifty percent. A typical manufacturer is happy with ten. [[chart:bar|Operating margin (%)|Typical maker=10,Keyence=50|%|SAMPLE: verify against annual reports]]
+
+## Origins
+In 1974, a young engineer named Takemitsu Takizaki started a tiny sensor company in Osaka. [[photo:Osaka skyline]]
+
+## The Real Product
+The secret is not the sensor. It is the salesman. [[query:sales meeting office]]
