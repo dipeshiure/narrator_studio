@@ -547,5 +547,9 @@
  "js.voice.need_file": "録音ファイルを選んでください",
  "js.voice.need_consent": "自分の声か、使う許可をもらった声だけ追加できます(チェックを入れてください)",
  "js.voice.adding": "声を追加しています…(聞き取りに少しかかります)",
- "js.voice.added": "声を追加しました。ナレーターで選べます"
+ "js.voice.added": "声を追加しました。ナレーターで選べます",
+ "voice.quality": "声づくりの優先",
+ "voice.stable": "安定(声がそろう)",
+ "voice.fast": "速さ",
+ "voice.quality_hint": "「速さ」は、ずれた文の作り直しを減らして速く作ります。声が途中で変わる文が増えることがあります。"
 }

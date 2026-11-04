@@ -517,7 +517,7 @@ STORY_PRESETS = {"bhatt": "長尺の語り(白黒イラスト)"}
 STORY_KEYS = {"voice", "tts_rate", "tts_pitch", "visuals", "aspect", "subs", "subs_engine", "kc_preset",
               "kc_font", "kc_size", "kc_position", "bgm", "bgm_mood", "bgm_volume",
               "hero", "image_seconds", "grain", "show_headings", "offline", "media_folder",
-              "tts_engine", "dia_seed", "dia_voice", "kc_accent_font", "tts_speed"}
+              "tts_engine", "dia_seed", "dia_voice", "kc_accent_font", "tts_speed", "tts_quality"}
 VOICE_SAMPLE = ("You were not built to quit. Every scar you carry is proof that you survived "
                 "what was meant to break you.")
 SIGNED = re.compile(r"^[+-]\d{1,3}(%|Hz)$")
@@ -536,6 +536,8 @@ def story_settings(body):
             s[k] = story.STORY_DEFAULTS[k]
     if s.get("tts_engine") not in ("edge", "dia", "say"):
         s["tts_engine"] = "edge"
+    if s.get("tts_quality") not in ("stable", "fast"):
+        s["tts_quality"] = "stable"
     try:
         s["tts_speed"] = max(0.5, min(1.5, float(s.get("tts_speed", 1.0))))
     except (TypeError, ValueError):

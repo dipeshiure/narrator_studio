@@ -541,5 +541,9 @@
  "js.voice.need_file": "请选择录音文件",
  "js.voice.need_consent": "只能添加自己的声音或已获许可的声音（请勾选）",
  "js.voice.adding": "正在添加声音…（识别需要一点时间）",
- "js.voice.added": "已添加声音，可在“讲述者”中选择"
+ "js.voice.added": "已添加声音，可在“讲述者”中选择",
+ "voice.quality": "声音优先项",
+ "voice.stable": "稳定（声音一致）",
+ "voice.fast": "速度",
+ "voice.quality_hint": "“速度”会减少对跑调句子的重做，所以更快完成。更多句子可能变成别的声音。"
 }

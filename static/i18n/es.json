@@ -541,5 +541,9 @@
  "js.voice.need_file": "Elige una grabación",
  "js.voice.need_consent": "Solo puedes añadir tu voz o una que tengas permiso para usar (marca la casilla)",
  "js.voice.adding": "Añadiendo la voz… (la transcripción tarda un poco)",
- "js.voice.added": "Voz añadida. Elígela en Narrador"
+ "js.voice.added": "Voz añadida. Elígela en Narrador",
+ "voice.quality": "Prioridad de la voz",
+ "voice.stable": "Estable (voz constante)",
+ "voice.fast": "Rápido",
+ "voice.quality_hint": "«Rápido» rehace menos las frases que se desvían, así termina antes. Más frases pueden cambiar de voz."
 }

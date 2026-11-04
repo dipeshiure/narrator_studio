@@ -68,3 +68,20 @@ def test_dia_job_uses_the_recorded_voice(voices_dir, tmp_path, monkeypatch):
     assert seen["ref_audio"].endswith("abc123def0.wav") and seen["ref_text"] == "hello there my friend"
     assert story.voice_label({"dia_voice": "abc123def0"}) == "Dia Me"
     assert story.my_voice("../etc") is None
+
+
+def test_voice_quality_sets_dia_tries(tmp_path, monkeypatch):
+    seen = {}
+
+    class Stop(Exception):
+        pass
+
+    def fake_popen(cmd, **kw):
+        seen.update(mv.read_json(Path(cmd[2]), {}))
+        raise Stop
+    monkeypatch.setattr(story.subprocess, "Popen", fake_popen)
+    for q, n in (("fast", 2), ("stable", 5)):
+        with pytest.raises(Stop):
+            story.dia_voice([{"text": "Hi there."}], [tmp_path / f"{q}.wav"], {"dia_seed": 33, "tts_quality": q}, log=lambda *a: None)
+        assert seen["tries"] == n
+    assert server.story_settings({"options": {"tts_quality": "bogus"}})[1]["tts_quality"] == "stable"

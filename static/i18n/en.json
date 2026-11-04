@@ -547,5 +547,9 @@
  "js.voice.need_file": "Choose a recording",
  "js.voice.need_consent": "Only your own voice or one you may use can be added (tick the box)",
  "js.voice.adding": "Adding the voice… (transcribing takes a moment)",
- "js.voice.added": "Voice added. Pick it under Narrator"
+ "js.voice.added": "Voice added. Pick it under Narrator",
+ "voice.quality": "Voice priority",
+ "voice.stable": "Stable (consistent voice)",
+ "voice.fast": "Fast",
+ "voice.quality_hint": "\"Fast\" redoes off-voice lines less, so it finishes sooner. More lines may drift to another voice."
 }

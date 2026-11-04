@@ -120,6 +120,7 @@ def main(path):
     print(f"TTS {len(items) - len(todo)} {len(items)}", flush=True)
     ref_dir = Path(job["ref_dir"]); ref_dir.mkdir(parents=True, exist_ok=True)
     ref_text = job.get("ref_text") or REF_TEXT
+    tries = max(1, min(5, int(job.get("tries", TRIES))))   # "fast" = fewer redo attempts
     speed = max(0.5, min(2.0, float(job.get("speed", 1.0))))   # 1.0 = Dia's own pace
     ref = Path(job["ref_audio"]) if job.get("ref_audio") else ref_dir / f"dia_seed{seed}.wav"
     if not todo and ref.exists():
@@ -138,7 +139,7 @@ def main(path):
             parts = []
             for k, text in enumerate(chunks(it["text"])):
                 best = None
-                for t in range(TRIES):
+                for t in range(tries):
                     wait_for_memory(mx.clear_cache)
                     wav = say(model, text, seed + 1000 * t + k, tmp, f"c{k}_{t}", ref, ref_text)
                     hz, dur = pitch(wav)

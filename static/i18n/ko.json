@@ -541,5 +541,9 @@
  "js.voice.need_file": "녹음 파일을 고르세요",
  "js.voice.need_consent": "내 목소리나 허락받은 목소리만 추가할 수 있습니다(체크하세요)",
  "js.voice.adding": "목소리를 추가하는 중…(받아쓰기에 조금 걸립니다)",
- "js.voice.added": "목소리를 추가했습니다. 내레이터에서 고를 수 있습니다"
+ "js.voice.added": "목소리를 추가했습니다. 내레이터에서 고를 수 있습니다",
+ "voice.quality": "목소리 우선순위",
+ "voice.stable": "안정(목소리 일정)",
+ "voice.fast": "속도",
+ "voice.quality_hint": "‘속도’는 어긋난 문장을 다시 만드는 횟수를 줄여 더 빨리 끝냅니다. 중간에 목소리가 바뀌는 문장이 늘 수 있습니다."
 }

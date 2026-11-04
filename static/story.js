@@ -6,7 +6,7 @@
     bhatt: {
       hint: t('js.story.bhatt_hint'),
       o: { tts: 'dia', dia_seed: 33, voice: 'en-US-ChristopherNeural', speed: 0.92, pitch: -4, visuals: 'ai', aspect: '16:9', grain: true,
-           headings: false, engine: 'kinetic', kc_preset: 'bhatt', kc_font: '', kc_accent_font: '', kc_size: 1.0,
+           headings: false, tts_quality: 'stable', engine: 'kinetic', kc_preset: 'bhatt', kc_font: '', kc_accent_font: '', kc_size: 1.0,
            bgm: true, mood: 'dark' },
     },
   };
@@ -26,7 +26,7 @@
     const o = st.o;
     seg('story-preset', st.preset); seg('story-visuals', o.visuals); seg('story-aspect', o.aspect);
     seg('story-engine', o.engine); seg('story-kc-preset', o.kc_preset); seg('story-mood', o.mood);
-    seg('story-style', st.style); seg('story-minutes', st.minutes);
+    seg('story-style', st.style); seg('story-tts-quality', o.tts_quality || 'stable'); seg('story-minutes', st.minutes);
     $('#story-preset-hint').textContent = PRESETS[st.preset].hint;
     $('#story-voice').value = o.voice;
     const dia = o.tts === 'dia';
@@ -230,6 +230,7 @@
   onSeg('story-engine', v => set('engine', v));
   onSeg('story-kc-preset', v => set('kc_preset', v));
   onSeg('story-mood', v => set('mood', v));
+  onSeg('story-tts-quality', v => set('tts_quality', v));
   onSeg('story-style', v => { st.style = v; saveState(); paint(); });
   onSeg('story-minutes', v => { st.minutes = Number(v); saveState(); paint(); });
   $('#story-voice').addEventListener('change', e => set('voice', e.target.value));
@@ -411,7 +412,7 @@
   // the 仕上がり panel as server options — shared by "動画を作る" and the batch
   function storyOptions() {
     const o = st.o;
-    return { tts_engine: o.tts === 'dia' ? 'dia' : 'edge', dia_seed: o.dia_seed || 33, dia_voice: o.dia_voice || '', voice: o.voice, tts_rate: ratePct(o.speed), tts_speed: o.speed, tts_pitch: signed(o.pitch, 'Hz'),
+    return { tts_engine: o.tts === 'dia' ? 'dia' : 'edge', dia_seed: o.dia_seed || 33, dia_voice: o.dia_voice || '', tts_quality: o.tts_quality || 'stable', voice: o.voice, tts_rate: ratePct(o.speed), tts_speed: o.speed, tts_pitch: signed(o.pitch, 'Hz'),
              visuals: o.visuals, hero: o.hero || '', media_folder: o.media_folder || '', aspect: o.aspect, grain: o.grain,
              show_headings: o.headings, subs: o.engine !== 'off',
              subs_engine: o.engine === 'off' ? 'simple' : o.engine,

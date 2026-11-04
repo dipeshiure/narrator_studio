@@ -52,6 +52,7 @@ STORY_DEFAULTS = {
     "dia_seed": 33,                  # dia: which invented speaker (33 / 21 / 64 are male voices)
     "voice": "en-US-GuyNeural",
     "tts_rate": "+0%",
+    "tts_quality": "stable",         # dia: "stable" (up to 5 tries per chunk) / "fast" (2): faster, the voice may wander more
     "tts_speed": 1.0,                # speaking speed as a multiplier (1.0 = normal): edge rate and Dia tempo
     "tts_pitch": "+0Hz",             # lower = deeper voice, e.g. "-6Hz"
     "visuals": "stock",              # stock (Pexels) / ai (ink illustrations, illustrate.py) / folder (your own media)
@@ -505,6 +506,7 @@ def dia_voice(scenes, wavs, s, log=print):
     if todo:
         job = todo[0][1].parent / "dia_job.json"
         spec = {"seed": int(s.get("dia_seed", 33)), "ref_dir": str(DIA_REFS), "speed": float(s.get("tts_speed", 1.0)),
+                "tries": 2 if s.get("tts_quality") == "fast" else 5,
                 "items": [{"text": sc["text"], "out": str(w)} for sc, w in todo]}
         mine = my_voice(s.get("dia_voice"))
         if mine:                                   # the user's recorded voice is the speaker
