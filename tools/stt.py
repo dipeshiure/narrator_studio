@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 _hub = Path.home() / ".cache" / "huggingface" / "hub"   # cached models: no hub lookup (flaky connections)
-if (_hub / "models--mlx-community--whisper-base-asr-fp16").exists():
+if len(sys.argv) > 1 and (_hub / ("models--" + sys.argv[1].replace("/", "--"))).exists():   # the model asked for
     os.environ.setdefault("HF_HUB_OFFLINE", "1")
 
 from mlx_audio.stt.utils import load_model
