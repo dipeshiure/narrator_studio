@@ -545,5 +545,7 @@
  "voice.quality": "Priorité de la voix",
  "voice.stable": "Stable (voix constante)",
  "voice.fast": "Rapide",
- "voice.quality_hint": "« Rapide » refait moins les phrases qui dérivent, donc c'est plus vite fini. Plus de phrases peuvent changer de voix."
+ "voice.quality_hint": "« Rapide » refait moins les phrases qui dérivent, donc c'est plus vite fini. Plus de phrases peuvent changer de voix.",
+ "settings.low_power": "Le mode économie d'énergie est activé : la voix est plusieurs fois plus lente. Branchez le chargeur et désactivez-le dans Réglages Système → Batterie.",
+ "settings.on_battery": "Fonctionnement sur batterie. Branchez le chargeur pour une voix et des images plus rapides."
 }

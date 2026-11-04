@@ -58,6 +58,8 @@ async function loadSettings() {
     const r = await api('/api/system');
     $('#sys-mem').textContent = r.mem_free_pct + '%';
     $('#sys-mem').className = 'metric-value' + (r.mem_free_pct < 25 ? ' status-warn' : '');
+    const pw = $('#sys-power'); pw.hidden = !(r.low_power || r.on_battery);
+    pw.textContent = r.low_power ? t('settings.low_power') : t('settings.on_battery');
     $('#sys-swap').textContent = r.swap_used_mb == null ? '—' : fmtSize(r.swap_used_mb * 1048576);
     $('#sys-disk').textContent = fmtSize(r.disk_free);
     $('#sys-parts').innerHTML = r.parts.map(p => `<li><span class="badge ${p.ok ? 'badge-done' : 'badge-idle'}">${p.ok ? t('settings.ready') : t('settings.not_ready')}</span>

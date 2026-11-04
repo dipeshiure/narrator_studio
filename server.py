@@ -404,7 +404,12 @@ def system_status():
     parts = [("dia", "Dia-1.6B", story.dia_available()), ("flux", "FLUX.2 klein 4B", illustrate.available()),
              ("kinetic", "kinetic-captions", mv.kinetic_available()), ("ollama", "Ollama", ollama),
              ("pexels", "Pexels", mv.has_pexels_key())]
-    return jsonify({"mem_free_pct": memguard.free_pct(), "swap_used_mb": swap,
+    pw = subprocess.run(["pmset", "-g"], capture_output=True, text=True).stdout
+    batt = subprocess.run(["pmset", "-g", "batt"], capture_output=True, text=True).stdout
+    low_power = bool(re.search(r"lowpowermode\s+1", pw))
+    on_battery = "Battery Power" in batt
+    return jsonify({"low_power": low_power, "on_battery": on_battery,
+                    "mem_free_pct": memguard.free_pct(), "swap_used_mb": swap,
                     "disk_free": shutil.disk_usage(HERE).free,
                     "parts": [{"id": i, "name": n, "ok": bool(ok)} for i, n, ok in parts]})
 
