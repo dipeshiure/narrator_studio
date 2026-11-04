@@ -507,6 +507,7 @@ def dia_voice(scenes, wavs, s, log=print):
         job = todo[0][1].parent / "dia_job.json"
         spec = {"seed": int(s.get("dia_seed", 33)), "ref_dir": str(DIA_REFS), "speed": float(s.get("tts_speed", 1.0)),
                 "tries": 2 if s.get("tts_quality") == "fast" else 5,
+                "decode_bits": 4 if s.get("tts_quality") == "fast" else 8,
                 "items": [{"text": sc["text"], "out": str(w)} for sc, w in todo]}
         mine = my_voice(s.get("dia_voice"))
         if mine:                                   # the user's recorded voice is the speaker

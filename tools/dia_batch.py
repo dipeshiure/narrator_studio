@@ -40,6 +40,7 @@ import librosa
 import mlx.core as mx
 import numpy as np
 from mlx_audio.tts.generate import generate_audio
+import dia_fast
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from memguard import gpu_lock, unload_llms, wait_for_memory  # noqa: E402
 from mlx_audio.stt.utils import load_model as load_stt
@@ -116,6 +117,7 @@ def voice_feat(path):
 
 def say(model, text, seed, out_dir, name, ref=None, ref_text=REF_TEXT):
     mx.random.seed(int(seed))
+    model._fast_extra = int((len(("[S1] " + text).split()) + len(ref_text.split())) * MAX_SECS_PER_WORD * TOKENS_PER_SEC) + 400
     words = len(text.split()) + (len(ref_text.split()) if ref else 0)   # the prompt is part of the output
     generate_audio(text="[S1] " + text, model=model, ref_audio=str(ref) if ref else None,
                    ref_text=("[S1] " + ref_text) if ref else None, temperature=TEMPERATURE,
@@ -144,6 +146,14 @@ def main(path):
     unload_llms()                            # the local LLM can hold 4+ GB
     mx.set_cache_limit(512 * 1024 * 1024)   # keep freed GPU buffers small (no swap)
     model = load_model(MODEL)
+    bits = int(job.get("decode_bits", 8))             # compiled decoding with 8-bit (or 4-bit) matmuls; 0 = original path
+    if bits:
+        try:
+            dia_fast.install(model, bits)
+            print(f"FAST {bits}", flush=True)
+        except Exception as e:                        # never block narration on the speed-up
+            print(f"WARN fast decode unavailable ({e}); using the standard path", flush=True)
+            bits = 0
     if not ref.exists():               # also the voice sample on the 台本 page (items = [])
         say(model, REF_TEXT, seed, ref_dir, f"dia_seed{seed}")
     ref_hz, ref_cent, _, _ = voice_feat(ref)
@@ -157,7 +167,14 @@ def main(path):
                 best = None
                 for t in range(tries):
                     wait_for_memory(mx.clear_cache)
-                    wav = say(model, text, seed + 1000 * t + k, tmp, f"c{k}_{t}", ref, ref_text)
+                    try:
+                        wav = say(model, text, seed + 1000 * t + k, tmp, f"c{k}_{t}", ref, ref_text)
+                    except Exception as e:
+                        if not bits:
+                            raise
+                        print(f"WARN fast decode failed ({e}); switching to the standard path", flush=True)
+                        dia_fast.uninstall(model); bits = 0
+                        wav = say(model, text, seed + 1000 * t + k, tmp, f"c{k}_{t}", ref, ref_text)
                     hz, cent, spike, dur = voice_feat(wav)
                     drift = abs(math.log2(hz / ref_hz)) if hz and ref_hz else 9
                     timbre = abs(math.log2(cent / ref_cent)) if cent and ref_cent else 9
