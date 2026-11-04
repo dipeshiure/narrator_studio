@@ -122,6 +122,44 @@ def parse_tags(text, where="script"):
     return clean, tags
 
 
+SCENE_WORDS = 45      # a scene (one voice take + its pictures) is about this long: ~18 s of narration
+SCENE_MAX = 70        # a paragraph longer than this is split
+
+
+def split_text(text, target=SCENE_WORDS, limit=SCENE_MAX):
+    """Cut an over-long paragraph into roughly equal parts at sentence ends (else at commas,
+    else between words), so one scene never becomes a wall of text. Short text is returned as is."""
+    words = text.split()
+    if len(words) <= limit:
+        return [text.strip()]
+    sents = [x.strip() for x in re.findall(r"[^.!?…]+[.!?…]+[\"')\]]*\s*|[^.!?…]+$", text) if x.strip()]
+    pieces = []
+    for sent in sents:                              # a sentence that is itself too long: at , ; : —
+        if len(sent.split()) <= limit:
+            pieces.append(sent); continue
+        for part in re.findall(r"[^,;:—]+[,;:—]?\s*", sent):
+            pieces.append(part.strip())
+    pieces = [x for x in pieces if x]
+    n = max(2, round(len(words) / target))
+    goal = len(words) / n
+    out, cur, done = [], [], 0                      # cut where the running word count is nearest k * goal
+    for x in pieces:
+        w = len(x.split())
+        k = len(out) + 1
+        if cur and len(out) < n - 1 and abs(done + w - k * goal) > abs(done - k * goal):
+            out.append(" ".join(cur)); cur = []
+        cur.append(x); done += w
+    if cur:
+        out.append(" ".join(cur))
+    final = []
+    for x in out:                                   # still too long (no punctuation): split by words
+        ws = x.split()
+        k = max(1, -(-len(ws) // limit))
+        step = -(-len(ws) // k)
+        final += [" ".join(ws[i:i + step]) for i in range(0, len(ws), step)]
+    return final
+
+
 def load_script(path):
     path = Path(path)
     if path.suffix == ".json":
@@ -148,7 +186,13 @@ def load_script(path):
         sc["text"], tags = parse_tags(sc.get("text", ""), path.name)
         for k, v in tags.items():
             sc.setdefault(k, v)                       # explicit JSON fields win over inline tags
-    scenes = [sc for sc in data.get("scenes", []) if sc.get("text", "").strip()]
+    scenes = []
+    for sc in data.get("scenes", []):
+        if not sc.get("text", "").strip():
+            continue
+        parts = [sc["text"].strip()] if sc.get("chart") else split_text(sc["text"])
+        for k, part in enumerate(parts):            # tags and the chapter heading stay on the first part
+            scenes.append({**sc, "text": part} if k == 0 else {"text": part})
     if not data.get("title") or not scenes:
         raise ValueError(f"{path.name}: title と scenes(text) が必要です")
     data["scenes"] = scenes
