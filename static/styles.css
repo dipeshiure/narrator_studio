@@ -605,3 +605,13 @@ details.font-add { border: 1px solid var(--color-line); border-radius: var(--rad
 .finish-preview { margin: 0; position: sticky; top: 16px; }
 .finish-preview img { width: 100%; height: auto; border-radius: var(--radius-md); background: #000; display: block; aspect-ratio: 16 / 9; object-fit: cover; }
 @media (max-width: 900px) { .finish-grid { grid-template-columns: 1fr; } .finish-preview { position: static; } }
+
+/* filter picker: a thumbnail per filter, like the phone's photo filters */
+.finish-single { grid-template-columns: 1fr; }
+.look-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+.look-grid button { display: grid; gap: 6px; padding: 6px; border: 1px solid var(--color-line); border-radius: var(--radius-md);
+  background: var(--color-card); color: var(--color-muted-foreground); font-size: 12px; cursor: pointer; text-align: center;
+  transition: border-color 150ms var(--ease), color 150ms var(--ease); }
+.look-grid button:hover { border-color: var(--color-line-strong); color: var(--color-foreground); }
+.look-grid button[aria-pressed="true"] { border-color: var(--color-accent); color: var(--color-foreground); box-shadow: 0 0 0 1px var(--color-accent); }
+.look-grid img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: var(--radius-sm); background: #000; display: block; }

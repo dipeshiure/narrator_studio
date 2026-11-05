@@ -140,9 +140,19 @@ FINISH = CONF / "finish.json"
 FINISH_DEFAULTS = {"look": "original", "saturation": 1.0, "contrast": 1.0, "brightness": 0.0, "warmth": 0.0,
                    "art": "mono",             # AI illustrations: "mono" (black-and-white ink) or "color"
                    "transition": "crosszoom"}  # between pictures: "crosszoom" or "cut"
-LOOKS = {   # name -> (saturation x, contrast x, brightness +, warmth, extra ffmpeg filter)
+DRAMA = "curves=m='0/0 0.28/0.2 0.72/0.78 1/1'"          # deeper shadows, brighter highlights
+GRAY = "hue=s=0"
+LOOKS = {   # name -> (saturation x, contrast x, brightness +, warmth, extra ffmpeg filter): the filters people know from phones
     "original": (1.0, 1.0, 0.0, 0.0, ""),
     "vivid": (1.35, 1.08, 0.0, 0.0, ""),
+    "vivid_warm": (1.35, 1.08, 0.0, 0.4, ""),
+    "vivid_cool": (1.35, 1.08, 0.0, -0.4, ""),
+    "dramatic": (0.85, 1.22, -0.03, 0.0, DRAMA),
+    "dramatic_warm": (0.85, 1.22, -0.03, 0.4, DRAMA),
+    "dramatic_cool": (0.85, 1.22, -0.03, -0.4, DRAMA),
+    "mono": (1.0, 1.0, 0.0, 0.0, GRAY),
+    "silvertone": (1.0, 0.95, 0.02, 0.0, GRAY + ",curves=all='0/0.05 1/0.95'"),
+    "noir": (1.0, 1.45, -0.06, 0.0, GRAY),
     "warm": (1.1, 1.03, 0.0, 0.45, ""),
     "cool": (1.05, 1.03, 0.0, -0.45, ""),
     "cinema": (1.15, 1.1, -0.02, 0.0, "colorbalance=rs=-0.12:gs=-0.02:bs=0.16:rh=0.16:gh=0.03:bh=-0.12"),

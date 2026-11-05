@@ -69,34 +69,35 @@ async function loadSettings() {
 }
 $('#sys-refresh').addEventListener('click', loadSettings);
 
-// ---- finishing look: saved on the server, applied to every video
-let FIN = null, finTimer = null;
-const finSliders = { saturation: 2, contrast: 2, brightness: 2, warmth: 2 };
-function paintFinish() {
-  $('#fin-look').value = FIN.look;
-  for (const k of Object.keys(finSliders)) { $('#fin-' + k).value = FIN[k]; $('#o-fin-' + k).textContent = Number(FIN[k]).toFixed(2); }
+// ---- finishing look: pick a filter; saved on the server and applied to every video
+let FIN = null, finSave = null;
+const LOOK_ORDER = ['original', 'vivid', 'vivid_warm', 'vivid_cool', 'dramatic', 'dramatic_warm', 'dramatic_cool',
+                    'mono', 'silvertone', 'noir', 'warm', 'cool', 'cinema', 'sepia'];
+function paintFinish(first = false) {
+  if (first) {                                           // one thumbnail per filter, made by the same ffmpeg filter as the video
+    $('#fin-looks').innerHTML = LOOK_ORDER.filter(k => FIN.looks.includes(k)).map(k => `<button data-look="${k}" aria-pressed="false">
+        <img alt="" width="160" height="90" loading="lazy" data-look-img="${k}"><span>${t('finish.look_' + k)}</span></button>`).join('');
+    $$('#fin-looks img').forEach(async img => {
+      try {
+        const r = await fetch('/api/finish/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ look: img.dataset.lookImg, saturation: 1, contrast: 1, brightness: 0, warmth: 0, w: 320 }) });
+        if (r.ok) img.src = URL.createObjectURL(await r.blob());
+      } catch { /* no sample picture yet */ }
+    });
+  }
+  $$('#fin-looks button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.look === FIN.look)));
   $$('#fin-art button, #fin-transition button').forEach(b => b.setAttribute('aria-pressed', String(FIN[b.parentElement.id === 'fin-art' ? 'art' : 'transition'] === b.dataset.v)));
-  $('#fin-preview').src = '#';
-  clearTimeout(finTimer);
-  finTimer = setTimeout(async () => {                       // the preview is made by the same ffmpeg filter as the video
-    try {
-      const r = await fetch('/api/finish/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(FIN) });
-      if (r.ok) $('#fin-preview').src = URL.createObjectURL(await r.blob());
-    } catch { /* no preview picture yet */ }
-  }, 250);
 }
-async function loadFinish() { FIN = await api('/api/finish'); paintFinish(); }
-let finSave = null;
+async function loadFinish() { FIN = await api('/api/finish'); paintFinish(true); }
 function changeFinish(patch) {
   FIN = { ...FIN, ...patch }; paintFinish();
   clearTimeout(finSave);
   finSave = setTimeout(async () => {
     try { await api('/api/finish', { method: 'POST', body: FIN }); const b = $('#finish-saved'); b.hidden = false; setTimeout(() => b.hidden = true, 1500); }
     catch (e) { toast(e.message); }
-  }, 400);
+  }, 300);
 }
-$('#fin-look').addEventListener('change', e => changeFinish({ look: e.target.value }));
-Object.keys(finSliders).forEach(k => $('#fin-' + k).addEventListener('input', e => changeFinish({ [k]: Number(e.target.value) })));
+$('#fin-looks').addEventListener('click', e => { const b = e.target.closest('button'); if (b) changeFinish({ look: b.dataset.look, saturation: 1, contrast: 1, brightness: 0, warmth: 0 }); });
 $('#fin-art').addEventListener('click', e => { const b = e.target.closest('button'); if (b) changeFinish({ art: b.dataset.v }); });
 $('#fin-transition').addEventListener('click', e => { const b = e.target.closest('button'); if (b) changeFinish({ transition: b.dataset.v }); });
 $('#fin-reset').addEventListener('click', () => changeFinish({ look: 'original', saturation: 1, contrast: 1, brightness: 0, warmth: 0, art: 'mono', transition: 'crosszoom' }));

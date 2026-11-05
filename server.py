@@ -408,11 +408,15 @@ def finish_preview():
     if not pics:
         return jsonify({"error": "プレビュー用の絵がまだありません"}), 404
     flt = mv.finish_filter(f)
-    key = hashlib.md5((pics[0].name + flt).encode()).hexdigest()[:12]
+    try:
+        width = max(120, min(800, int(body.get("w", 640)) // 2 * 2))
+    except (TypeError, ValueError):
+        width = 640
+    key = hashlib.md5((pics[0].name + flt + str(width)).encode()).hexdigest()[:12]
     out = mv.TMP / "finish_preview" / f"{key}.jpg"
     if not out.exists():
         out.parent.mkdir(parents=True, exist_ok=True)
-        vf = "scale=640:-2" + ("," + flt if flt else "")
+        vf = f"scale={width}:-2" + ("," + flt if flt else "")
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(pics[0]), "-vf", vf, "-frames:v", "1", str(out)], check=True)
     return send_file(out, mimetype="image/jpeg")
 

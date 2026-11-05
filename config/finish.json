@@ -4,6 +4,6 @@
   "contrast": 1.0,
   "brightness": 0.0,
   "warmth": 0.0,
-  "art": "mono",
+  "art": "color",
   "transition": "crosszoom"
 }
