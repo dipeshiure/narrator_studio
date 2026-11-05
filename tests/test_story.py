@@ -278,3 +278,27 @@ def test_planner_reads_small_model_answers(monkeypatch):
     assert fake({"pictures": ["a", "b"]}) == ["a", "b"]
     assert fake({"image1": "a", "image2": "b"}) == ["a", "b"]       # what qwen2.5 really answers
     assert fake(["a", "b"]) == ["a", "b"]
+
+
+def test_auto_genre_asks_the_ai_for_the_look_and_remembers_it(sandbox, tmp_path, monkeypatch):
+    import json as _json
+    calls = []
+
+    def fake(prompt, model, as_json=False, timeout=600):
+        calls.append(prompt)
+        return _json.dumps({"genre": "History", "look": "gritty oil painting with muted blues and grey, dramatic light and heavy shadows",
+                            "art": "color", "hero": "a tired ship's officer in a dark uniform", "subjects": "Show the ship, the sea and the crew.",
+                            "mood": "dark"})
+    monkeypatch.setattr(story, "_ollama", fake)
+    data = {"title": "The Night the Ship Sank", "scenes": [{"text": "The bell rang three times."}]}
+    s = story.load_story_settings("auto")
+    s["hero"] = "none"
+    story.art_direction(data, s, tmp_path, log=lambda *a: None)
+    assert "oil painting" in s["style_color"] and "no text" in s["style_color"] and "black and white" in s["style_mono"]
+    assert s["hero"].startswith("a tired ship") and s["planner_hint"] == "Show the ship, the sea and the crew." and s["bgm_mood"] == "dark"
+    story.art_direction(data, story.load_story_settings("auto"), tmp_path, log=lambda *a: None)
+    assert len(calls) == 1                                        # same script: the saved direction is reused
+    monkeypatch.setattr(story, "_ollama", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("down")))
+    s2 = story.load_story_settings("auto")
+    story.art_direction({"title": "T2", "scenes": [{"text": "Other."}]}, s2, tmp_path / "x", log=lambda *a: None)
+    assert "cinematic illustration" in s2["style_color"]           # AI down: a sensible default, never a crash

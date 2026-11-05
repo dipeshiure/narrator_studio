@@ -603,5 +603,7 @@
  "js.genre.hint_nature": "Nature and animals: wildlife and landscapes as documentary-style photographs.",
  "js.genre.hint_mystery": "Mystery and scary stories: fog, shadows and old houses in suspenseful black and white.",
  "js.genre.hint_science": "Science explainers: the mechanism or experiment in bright, clear pictures.",
- "js.genre.hint_fantasy": "Fantasy: castles, dragons and magic as epic pictures."
+ "js.genre.hint_fantasy": "Fantasy: castles, dragons and magic as epic pictures.",
+ "genre.auto": "Automatic (from the script)",
+ "js.genre.hint_auto": "The AI reads your script and decides the look of the pictures, the main character and the music mood by itself. Works for any subject: space, cooking, war, stories ..."
 }

@@ -597,5 +597,7 @@
  "js.genre.hint_nature": "自然·动物：用纪录片摄影风表现动物和风景。",
  "js.genre.hint_mystery": "悬疑·恐怖：用雾、影子和老房子，以黑白营造气氛。",
  "js.genre.hint_science": "科学讲解：用明亮清晰的画面表现原理和实验。",
- "js.genre.hint_fantasy": "奇幻：用壮阔的画面表现城堡、龙和魔法。"
+ "js.genre.hint_fantasy": "奇幻：用壮阔的画面表现城堡、龙和魔法。",
+ "genre.auto": "自动（根据脚本）",
+ "js.genre.hint_auto": "AI 阅读脚本后，自己决定画面风格、主角和音乐氛围。任何主题都可以：宇宙、料理、战争、故事……"
 }

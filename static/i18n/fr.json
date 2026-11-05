@@ -597,5 +597,7 @@
  "js.genre.hint_nature": "Nature et animaux : faune et paysages comme des photos de documentaire.",
  "js.genre.hint_mystery": "Mystère et peur : brouillard, ombres et vieilles maisons en noir et blanc plein de suspense.",
  "js.genre.hint_science": "Science : le mécanisme ou l'expérience en images claires et lumineuses.",
- "js.genre.hint_fantasy": "Fantasy : châteaux, dragons et magie en images épiques."
+ "js.genre.hint_fantasy": "Fantasy : châteaux, dragons et magie en images épiques.",
+ "genre.auto": "Automatique (selon le script)",
+ "js.genre.hint_auto": "L'IA lit votre script et décide seule du rendu des images, du personnage principal et de l'ambiance musicale. Convient à tout sujet : espace, cuisine, guerre, récits…"
 }

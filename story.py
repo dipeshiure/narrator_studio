@@ -347,6 +347,60 @@ STOP = set("the a an and or but of to in on for with at by from is are was were 
            "very into over about after before only even still every each one two three".split())
 
 
+DIRECTION_PROMPT = (
+    "You are the art director of a narrated video. Read the title and the script and decide the visual direction of "
+    "ALL its pictures, so that they fit the subject and the mood of the words. Answer as JSON with these keys: "
+    "\"genre\": 1-3 English words naming the kind of story; "
+    "\"look\": ONE English sentence (15-35 words) describing the art style, medium, palette and lighting of every picture "
+    "(for example: cinematic sci-fi concept art, deep blues and gold; or: painterly oil illustration with warm earthy colours); "
+    "\"art\": \"color\" or \"mono\" (use mono only for stark, grim or noir stories); "
+    "\"hero\": a short English description of ONE recurring main character if the story follows one person (age, build, clothes), "
+    "otherwise \"none\"; "
+    "\"subjects\": 2-3 English sentences telling the illustrators what kinds of things to show for this script; "
+    "\"mood\": one of \"dark\", \"epic\", \"uplifting\" (the music). "
+    "No real people, no existing characters or franchises, no text in pictures.")
+
+
+def art_direction(data, s, work, log=print):
+    """For the 'auto' genre: one LLM call turns title + script into the picture look, main character,
+    scene guidance and music mood, kept in work/direction.json so a re-render looks the same.
+    Fills s['style_color'/'style_mono'/'planner_hint'/'hero'/'art_default'/'bgm_mood']."""
+    cache = Path(work) / "direction.json"
+    d = mv.read_json(cache, None)
+    key = mv.hashlib.md5((data["title"] + "".join(sc["text"] for sc in data["scenes"])).encode()).hexdigest()
+    if not d or d.get("key") != key:
+        text = " ".join(sc["text"] for sc in data["scenes"])
+        sample = text[:2500] + (" ... " + text[-800:] if len(text) > 3300 else "")
+        log("  台本の内容から、絵の雰囲気を決めています(AI)")
+        try:
+            raw = json.loads(_ollama(f"{DIRECTION_PROMPT}\n\nTitle: {data['title']}\n\nScript:\n{sample}", s["llm_model"], as_json=True))
+            d = {"key": key, **{k: str(raw.get(k, "")).strip() for k in ("genre", "look", "art", "hero", "subjects", "mood")}}
+            if len(d["look"]) < 10:
+                raise ValueError("no look")
+        except Exception as e:
+            log(f"  ! 絵の雰囲気を決められませんでした({e})。標準の雰囲気で作ります")
+            d = {"key": key, "genre": "", "look": "cinematic illustration, rich colours, dramatic lighting", "art": "color",
+                 "hero": "none", "subjects": "", "mood": "epic"}
+        mv.write_json(cache, d)
+    look = d["look"].rstrip(". ")
+    full = ("single full-bleed illustration filling the entire frame edge to edge, no panels, no borders, no frames, {look}, "
+            "detailed background, clean empty margins, no text, no letters, no writing, no handwriting, no signature, "
+            "no logo, no caption, no speech bubbles, no watermark")
+    s["style_color"] = full.format(look=look)
+    s["style_mono"] = full.format(look="black and white ink illustration, heavy hatching, strong contrast, " + look)
+    s["planner_hint"] = d["subjects"]
+    s["art_default"] = "mono" if d["art"] == "mono" else "color"
+    if s.get("hero") in ("none", "", None):
+        hero = d["hero"].strip()
+        s["hero"] = "none" if hero.lower() in ("", "none", "no", "n/a") else hero
+    if d["mood"] in ("dark", "epic", "uplifting"):
+        s["bgm_mood"] = d["mood"]
+    if s.get("_art_from_genre"):                       # the Settings choice "match the genre": follow the AI's pick
+        s["art"] = s["art_default"]
+        s["saturation"] = 1.0 if s["art"] == "color" else s.get("saturation", 0.0)
+    log(f"  絵の雰囲気: {d['genre'] or '標準'} / {look[:80]}")
+
+
 def keyword_query(text, fallback):
     """No LLM: the two most frequent content words of the scene."""
     words = [w.lower() for w in re.findall(r"[A-Za-z]{4,}", text) if w.lower() not in STOP]
@@ -929,6 +983,8 @@ def _make_story(script, outdir, s, log=print):
     if s.get("visuals") == "ai":
         import illustrate
         if illustrate.available():
+            if s.get("preset_id") == "auto":
+                art_direction(data, s, work, log)    # the AI reads the script and picks the look
             illustrate.plan(scenes, s, log)          # LLM first, then free it for FLUX
             mv.memory_gate(log)
             art = illustrate.illustrate([sc for sc in scenes], s, log)
@@ -1081,12 +1137,14 @@ def load_story_settings(preset):
     fin = mv.load_finish()                             # Settings: colour of the pictures, zoom, transition
     s.update(art=fin["art"], zoom_amount=fin["zoom_amount"], zoom_focus=fin["zoom_focus"],
              cross=mv.TRANSITION_SECONDS[fin["transition_speed"]])
+    s["preset_id"] = preset
     if preset:
         p = PRESETS / f"{preset}.json"
         if not p.exists():
             raise SystemExit(f"プリセットがありません: {p}")
         s.update(mv.read_json(p, {}))
     if s["art"] == "genre":
+        s["_art_from_genre"] = True
         s["art"] = s.get("art_default", "mono")        # follow the genre (ink for motivation, colour for space ...)
     if s["art"] == "color":
         s["saturation"] = 1.0                          # the ink preset greys every picture: colour needs it back

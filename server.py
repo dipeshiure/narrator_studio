@@ -556,7 +556,7 @@ VOICES = [  # edge-tts (free). Deep / calm voices first: they suit long-form nar
     {"id": "en-GB-RyanNeural", "label": "Ryan(英国)"},
     {"id": "en-GB-ThomasNeural", "label": "Thomas(英国)"},
 ]
-STORY_PRESETS = {"bhatt": "モチベーション(白黒)", "space": "宇宙・SF", "history": "歴史", "nature": "自然・動物",
+STORY_PRESETS = {"auto": "自動(台本から判断)", "bhatt": "モチベーション(白黒)", "space": "宇宙・SF", "history": "歴史", "nature": "自然・動物",
                  "mystery": "ミステリー・怖い話", "science": "科学・解説", "fantasy": "ファンタジー"}
 STORY_KEYS = {"voice", "tts_rate", "tts_pitch", "visuals", "aspect", "subs", "subs_engine", "kc_preset",
               "kc_font", "kc_size", "kc_position", "bgm", "bgm_mood", "bgm_volume",

@@ -12,7 +12,7 @@
   };
   // the other genres: same voice and layout, their own caption style and music mood (the picture look,
   // narration voice and scene ideas come from config/presets/<genre>.json on the server)
-  const GENRE_O = { space: { mood: 'epic' }, history: { mood: 'epic' }, nature: { mood: 'uplifting' },
+  const GENRE_O = { auto: { mood: 'epic' }, space: { mood: 'epic' }, history: { mood: 'epic' }, nature: { mood: 'uplifting' },
                     mystery: { mood: 'dark' }, science: { mood: 'uplifting' }, fantasy: { mood: 'epic' } };
   for (const [g, o] of Object.entries(GENRE_O)) {
     PRESETS[g] = { hint: t('js.genre.hint_' + g), o: { ...PRESETS.bhatt.o, kc_preset: 'cinema', grain: g !== 'space' && g !== 'nature' && g !== 'science', speed: 1.0, pitch: 0, ...o } };
@@ -198,8 +198,8 @@
   window.loadStory = async () => {
     if (!st) {
       const saved = UI.story || {};
-      st = { title: '', text: '', preset: 'bhatt', style: 'bhatt', minutes: 10, job: null, ...saved,
-             ...(PRESETS[saved.preset] ? {} : { preset: 'bhatt' }),
+      st = { title: '', text: '', preset: 'auto', style: 'bhatt', minutes: 10, job: null, ...saved,
+             ...(PRESETS[saved.preset] ? {} : { preset: 'auto' }),
              ...(['bhatt', 'motivation'].includes(saved.style) ? {} : { style: 'bhatt' }),
              o: { ...PRESETS.bhatt.o, hero: '', ...(saved.o || {}) } };
       if (st.o.tts === 'dia' || !st.o.tts) st.o.tts = 'cosy';                                  // Dia was removed
