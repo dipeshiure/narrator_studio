@@ -222,3 +222,28 @@ def test_finish_looks_and_art_colour(sandbox):
     assert "hue=s=0" in mv.finish_filter(mv.load_finish())
     s = story.load_story_settings("bhatt")
     assert s["art"] == "color" and s["saturation"] == 1.0                             # colour art: the ink preset's grey is undone
+
+
+def test_zoom_settings_and_cross_zoom_join(sandbox, tmp_path):
+    import make_video as mv
+    png = tmp_path / "pic.png"
+    mv.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc2=s=960x544:d=0.04", "-frames:v", "1", str(png)])
+    base = story.load_story_settings("bhatt")
+    segs = []
+    for i, (amount, focus) in enumerate([("none", "face"), ("slow", "left"), ("normal", "auto"), ("strong", "bottom"), ("normal", "right")]):
+        s = {**base, "zoom_amount": amount, "zoom_focus": focus, "cross": 0.9}
+        d = tmp_path / f"c{i}.mp4"
+        story.render_photo(png, 2.0 + 0.9, d, s, n=i)
+        assert abs(mv.duration(d) - 2.9) < 0.1
+        segs.append(d)
+    out = story.join_crosszoom(segs, {**base, "cross": 0.9}, tmp_path, group=3)
+    assert abs(mv.duration(out) - (5 * 2.0 + 0.9)) < 0.15            # overlapping keeps the narration timeline
+    f = mv.load_finish()
+    assert f["zoom_amount"] == "normal" and f["zoom_focus"] == "face" and f["transition_speed"] == "normal"
+    mv.save_finish({**f, "zoom_amount": "bogus", "zoom_focus": "nowhere", "transition_speed": "x"})
+    g = mv.load_finish()
+    assert (g["zoom_amount"], g["zoom_focus"], g["transition_speed"]) == ("normal", "face", "normal")   # bad values fall back
+    s = story.load_story_settings("bhatt")
+    mv.save_finish({**f, "zoom_amount": "slow", "zoom_focus": "right", "transition_speed": "slow"})
+    s = story.load_story_settings("bhatt")
+    assert (s["zoom_amount"], s["zoom_focus"], s["cross"]) == ("slow", "right", 1.5)

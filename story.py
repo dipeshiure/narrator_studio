@@ -684,15 +684,17 @@ def render_photo(jpg, seconds, dest, s, n=0, trim=0.0):
     that FLUX draws in the corners)."""
     w, h = mv.frame_size(s)
     frames = max(1, round(seconds * FPS))
-    step = 0.06 / frames                               # 6 % zoom over the shot: gentle, faces stay whole
-    z = f"1.06-{step}*on" if n % 2 else f"1.0+{step}*on"
-    # the zoom is anchored near the top third (where heads are), so the face never slides out of frame;
-    # the horizontal anchor drifts a little from shot to shot
-    px = [0.5, 0.4, 0.6][n % 3]
-    x = f"(iw-iw/zoom)*{px}"
+    amt = mv.ZOOM_AMOUNT.get(s.get("zoom_amount", "normal"), 0.06)      # Settings: how far the picture pushes in
+    step = amt / frames
+    z = f"{1 + amt:.3f}-{step}*on" if n % 2 else f"1.0+{step}*on"       # in, out, in ...: neighbours meet at the same scale
+    focus = s.get("zoom_focus", "face")
+    if focus == "auto":                                                  # a different anchor each shot
+        focus = ["face", "left", "right", "center"][n % 4]
+    fx, fy = mv.ZOOM_FOCUS.get(focus, mv.ZOOM_FOCUS["face"])           # the anchor point stays where it is while zooming
+    x = f"(iw-iw/zoom)*{fx}"
     cut = f"crop=iw*{1 - 2 * trim:.3f}:ih*{1 - 2 * trim:.3f}," if trim else ""
     vf = (f"{cut}scale={w * 2}:{h * 2}:force_original_aspect_ratio=increase,crop={w * 2}:{h * 2},"
-          f"zoompan=z='{z}':x='{x}':y='(ih-ih/zoom)*0.30':d={frames}:s={w}x{h}:fps={FPS},"
+          f"zoompan=z='{z}':x='{x}':y='(ih-ih/zoom)*{fy}':d={frames}:s={w}x{h}:fps={FPS},"
           f"eq=contrast={s['contrast']}:brightness={s['brightness']}:saturation={s['saturation']}"
           + (",vignette=PI/4.5" if s.get("vignette") else "")
           + (",noise=alls=10:allf=t" if s.get("grain") else "") + ",format=yuv420p")
@@ -700,13 +702,13 @@ def render_photo(jpg, seconds, dest, s, n=0, trim=0.0):
             "-c:v", "h264_videotoolbox", "-b:v", s["bitrate"], str(dest)])
 
 
-CROSS = 0.4        # seconds two neighbouring pictures overlap in the cross zoom
-
-
 def join_crosszoom(segs, s, work, group=10):
-    """Join clips with ffmpeg's zoom-in cross transition. Every clip was rendered CROSS seconds longer
-    than its slot, so overlapping them keeps the timeline exactly where the narration expects it.
-    Done in groups of `group` clips (one small ffmpeg graph each), then the groups are joined the same way."""
+    """Join clips with a dissolve while both pictures are zooming around the chosen anchor (the clips
+    alternate push-in / pull-out, so the scale matches across the overlap: a cross zoom). Every clip was
+    rendered s["cross"] seconds longer than its slot, so overlapping them keeps the timeline exactly where the
+    narration expects it. Done in groups of `group` clips (one small ffmpeg graph each), then the groups are joined."""
+    CROSS = float(s["cross"])
+
     def chain(clips, dest):
         durs = [mv.duration(c) for c in clips]
         if len(clips) == 1:
@@ -718,7 +720,7 @@ def join_crosszoom(segs, s, work, group=10):
         for i in range(1, len(clips)):
             off += durs[i - 1] - CROSS
             lab = f"[v{i}]"
-            graph.append(f"{prev}[{i}:v]xfade=transition=zoomin:duration={CROSS}:offset={max(off, 0):.3f}{lab}")
+            graph.append(f"{prev}[{i}:v]xfade=transition=fade:duration={CROSS}:offset={max(off, 0):.3f}{lab}")
             prev = lab
         mv.run(cmd + ["-filter_complex", ";".join(graph), "-map", prev, "-r", str(FPS), "-pix_fmt", "yuv420p",
                       "-c:v", "h264_videotoolbox", "-b:v", s["bitrate"], str(dest)])
@@ -938,7 +940,7 @@ def _make_story(script, outdir, s, log=print):
     used_photos, credits, photo_credits = set(), [], []
     for i, sc in enumerate(scenes):
         if i in art and not sc.get("chart"):
-            each = sc["dur"] / len(art[i]) + (CROSS if crosszoom else 0)    # cross-zoom overlaps clips by CROSS s
+            each = sc["dur"] / len(art[i]) + (s["cross"] if crosszoom else 0)    # neighbours overlap by s["cross"] seconds
             for j, png in enumerate(art[i]):
                 seg = work / f"s{i:03d}_a{j:02d}.mp4"
                 pic = illustrate.trim_bands(png, work / f"s{i:03d}_a{j:02d}.png")   # no side bars
@@ -1076,7 +1078,9 @@ def _make_story(script, outdir, s, log=print):
 
 def load_story_settings(preset):
     s = {**mv.load_settings(), **STORY_DEFAULTS}
-    s["art"] = mv.load_finish()["art"]                 # Settings: black-and-white ink or colour illustrations
+    fin = mv.load_finish()                             # Settings: colour of the pictures, zoom, transition
+    s.update(art=fin["art"], zoom_amount=fin["zoom_amount"], zoom_focus=fin["zoom_focus"],
+             cross=mv.TRANSITION_SECONDS[fin["transition_speed"]])
     if preset:
         p = PRESETS / f"{preset}.json"
         if not p.exists():

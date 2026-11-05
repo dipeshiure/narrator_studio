@@ -139,7 +139,13 @@ def save_settings(s, path=None):
 FINISH = CONF / "finish.json"
 FINISH_DEFAULTS = {"look": "original", "saturation": 1.0, "contrast": 1.0, "brightness": 0.0, "warmth": 0.0,
                    "art": "mono",             # AI illustrations: "mono" (black-and-white ink) or "color"
-                   "transition": "crosszoom"}  # between pictures: "crosszoom" or "cut"
+                   "transition": "crosszoom",  # between pictures: "crosszoom" or "cut"
+                   "zoom_amount": "normal",    # slow push-in inside a picture: none / slow / normal / strong
+                   "zoom_focus": "face",       # where the zoom is anchored: face / center / left / right / bottom / auto
+                   "transition_speed": "normal"}  # how long two pictures overlap: fast / normal / slow
+ZOOM_AMOUNT = {"none": 0.0, "slow": 0.03, "normal": 0.06, "strong": 0.10}
+ZOOM_FOCUS = {"face": (0.5, 0.30), "center": (0.5, 0.5), "left": (0.3, 0.45), "right": (0.7, 0.45), "bottom": (0.5, 0.7)}
+TRANSITION_SECONDS = {"fast": 0.4, "normal": 0.9, "slow": 1.5}
 DRAMA = "curves=m='0/0 0.28/0.2 0.72/0.78 1/1'"          # deeper shadows, brighter highlights
 GRAY = "hue=s=0"
 LOOKS = {   # name -> (saturation x, contrast x, brightness +, warmth, extra ffmpeg filter): the filters people know from phones
@@ -172,6 +178,9 @@ def load_finish():
             f[k] = FINISH_DEFAULTS[k]
     f["art"] = f["art"] if f["art"] in ("mono", "color") else "mono"
     f["transition"] = f["transition"] if f["transition"] in ("crosszoom", "cut") else "crosszoom"
+    f["zoom_amount"] = f["zoom_amount"] if f["zoom_amount"] in ZOOM_AMOUNT else "normal"
+    f["zoom_focus"] = f["zoom_focus"] if f["zoom_focus"] in (*ZOOM_FOCUS, "auto") else "face"
+    f["transition_speed"] = f["transition_speed"] if f["transition_speed"] in TRANSITION_SECONDS else "normal"
     return f
 
 

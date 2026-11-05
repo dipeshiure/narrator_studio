@@ -572,5 +572,21 @@
  "finish.look_dramatic_cool": "ドラマチック(冷)",
  "finish.look_mono": "モノ",
  "finish.look_silvertone": "シルバートーン",
- "finish.look_noir": "ノワール"
+ "finish.look_noir": "ノワール",
+ "finish.tr_speed": "切り替えの速さ",
+ "finish.speed_fast": "速い",
+ "finish.speed_normal": "ふつう",
+ "finish.speed_slow": "ゆっくり",
+ "finish.zoom_amount": "ズームの強さ",
+ "finish.zoom_none": "なし",
+ "finish.zoom_slow": "弱い",
+ "finish.zoom_normal": "ふつう",
+ "finish.zoom_strong": "強い",
+ "finish.zoom_focus": "ズームする場所",
+ "finish.focus_face": "顔(上)",
+ "finish.focus_center": "中央",
+ "finish.focus_left": "左",
+ "finish.focus_right": "右",
+ "finish.focus_bottom": "下",
+ "finish.focus_auto": "自動で変える"
 }

@@ -1,9 +1,9 @@
 {
-  "look": "original",
-  "saturation": 1.0,
-  "contrast": 1.0,
-  "brightness": 0.0,
-  "warmth": 0.0,
+  "look": "cinema",
+  "saturation": 1,
+  "contrast": 1,
+  "brightness": 0,
+  "warmth": 0,
   "art": "color",
   "transition": "crosszoom"
 }

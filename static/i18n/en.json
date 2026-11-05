@@ -572,5 +572,21 @@
  "finish.look_dramatic_cool": "Dramatic Cool",
  "finish.look_mono": "Mono",
  "finish.look_silvertone": "Silvertone",
- "finish.look_noir": "Noir"
+ "finish.look_noir": "Noir",
+ "finish.tr_speed": "Transition speed",
+ "finish.speed_fast": "Fast",
+ "finish.speed_normal": "Normal",
+ "finish.speed_slow": "Slow",
+ "finish.zoom_amount": "Zoom amount",
+ "finish.zoom_none": "None",
+ "finish.zoom_slow": "Light",
+ "finish.zoom_normal": "Normal",
+ "finish.zoom_strong": "Strong",
+ "finish.zoom_focus": "Where to zoom",
+ "finish.focus_face": "Face (top)",
+ "finish.focus_center": "Centre",
+ "finish.focus_left": "Left",
+ "finish.focus_right": "Right",
+ "finish.focus_bottom": "Bottom",
+ "finish.focus_auto": "Vary it"
 }

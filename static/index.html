@@ -15,7 +15,7 @@
       window.applyTheme = apply; apply(); mq.addEventListener('change', apply);
     })();
   </script>
-  <link rel="stylesheet" href="/static/styles.css?v=20261105g">
+  <link rel="stylesheet" href="/static/styles.css?v=20261105h">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -626,6 +626,12 @@
               <div class="segmented" role="group" aria-labelledby="l-fin-art" id="fin-art"><button data-v="mono" data-i18n="finish.art_mono">白黒(墨)</button><button data-v="color" data-i18n="finish.art_color">カラー</button></div></div>
             <div class="field"><span class="label" id="l-fin-tr" data-i18n="finish.transition">絵の切り替え</span>
               <div class="segmented" role="group" aria-labelledby="l-fin-tr" id="fin-transition"><button data-v="crosszoom" data-i18n="finish.tr_cross">クロスズーム</button><button data-v="cut" data-i18n="finish.tr_cut">カット</button></div></div>
+            <div class="field" data-fin-zoom><span class="label" id="l-fin-ts" data-i18n="finish.tr_speed">切り替えの速さ</span>
+              <div class="segmented" role="group" aria-labelledby="l-fin-ts" id="fin-transition_speed"><button data-v="fast" data-i18n="finish.speed_fast">速い</button><button data-v="normal" data-i18n="finish.speed_normal">ふつう</button><button data-v="slow" data-i18n="finish.speed_slow">ゆっくり</button></div></div>
+            <div class="field"><span class="label" id="l-fin-za" data-i18n="finish.zoom_amount">ズームの強さ</span>
+              <div class="segmented" role="group" aria-labelledby="l-fin-za" id="fin-zoom_amount"><button data-v="none" data-i18n="finish.zoom_none">なし</button><button data-v="slow" data-i18n="finish.zoom_slow">弱い</button><button data-v="normal" data-i18n="finish.zoom_normal">ふつう</button><button data-v="strong" data-i18n="finish.zoom_strong">強い</button></div></div>
+            <div class="field"><span class="label" id="l-fin-zf" data-i18n="finish.zoom_focus">ズームする場所</span>
+              <div class="segmented seg-grid" role="group" aria-labelledby="l-fin-zf" id="fin-zoom_focus"><button data-v="face" data-i18n="finish.focus_face">顔(上)</button><button data-v="center" data-i18n="finish.focus_center">中央</button><button data-v="left" data-i18n="finish.focus_left">左</button><button data-v="right" data-i18n="finish.focus_right">右</button><button data-v="bottom" data-i18n="finish.focus_bottom">下</button><button data-v="auto" data-i18n="finish.focus_auto">自動で変える</button></div></div>
             <div class="row" style="justify-content:space-between"><button class="btn btn-sm" id="fin-reset" data-i18n="upload.30">初期設定に戻す</button></div>
           </div>
         </div>
@@ -651,12 +657,12 @@
   <div class="modal-body" id="post-modal-body"></div>
 </dialog>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
-<script src="/static/i18n.js?v=20261105g"></script>
-<script src="/static/app.js?v=20261105g"></script>
-<script src="/static/inbox.js?v=20261105g"></script>
-<script src="/static/posts.js?v=20261105g"></script>
-<script src="/static/rights.js?v=20261105g"></script>
-<script src="/static/story.js?v=20261105g"></script>
-<script src="/static/fonts.js?v=20261105g"></script>
+<script src="/static/i18n.js?v=20261105h"></script>
+<script src="/static/app.js?v=20261105h"></script>
+<script src="/static/inbox.js?v=20261105h"></script>
+<script src="/static/posts.js?v=20261105h"></script>
+<script src="/static/rights.js?v=20261105h"></script>
+<script src="/static/story.js?v=20261105h"></script>
+<script src="/static/fonts.js?v=20261105h"></script>
 </body>
 </html>

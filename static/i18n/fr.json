@@ -566,5 +566,21 @@
  "finish.look_dramatic_cool": "Dramatique froid",
  "finish.look_mono": "Mono",
  "finish.look_silvertone": "Argentique",
- "finish.look_noir": "Noir"
+ "finish.look_noir": "Noir",
+ "finish.tr_speed": "Vitesse de transition",
+ "finish.speed_fast": "Rapide",
+ "finish.speed_normal": "Normale",
+ "finish.speed_slow": "Lente",
+ "finish.zoom_amount": "Intensité du zoom",
+ "finish.zoom_none": "Aucun",
+ "finish.zoom_slow": "Léger",
+ "finish.zoom_normal": "Normal",
+ "finish.zoom_strong": "Fort",
+ "finish.zoom_focus": "Où zoomer",
+ "finish.focus_face": "Visage (haut)",
+ "finish.focus_center": "Centre",
+ "finish.focus_left": "Gauche",
+ "finish.focus_right": "Droite",
+ "finish.focus_bottom": "Bas",
+ "finish.focus_auto": "Varier"
 }

@@ -566,5 +566,21 @@
  "finish.look_dramatic_cool": "드라마틱(차갑)",
  "finish.look_mono": "모노",
  "finish.look_silvertone": "실버톤",
- "finish.look_noir": "느와르"
+ "finish.look_noir": "느와르",
+ "finish.tr_speed": "전환 속도",
+ "finish.speed_fast": "빠르게",
+ "finish.speed_normal": "보통",
+ "finish.speed_slow": "느리게",
+ "finish.zoom_amount": "줌 세기",
+ "finish.zoom_none": "없음",
+ "finish.zoom_slow": "약하게",
+ "finish.zoom_normal": "보통",
+ "finish.zoom_strong": "강하게",
+ "finish.zoom_focus": "줌 위치",
+ "finish.focus_face": "얼굴(위)",
+ "finish.focus_center": "가운데",
+ "finish.focus_left": "왼쪽",
+ "finish.focus_right": "오른쪽",
+ "finish.focus_bottom": "아래",
+ "finish.focus_auto": "자동으로 바꾸기"
 }

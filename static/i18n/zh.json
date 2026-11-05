@@ -566,5 +566,21 @@
  "finish.look_dramatic_cool": "戏剧（冷）",
  "finish.look_mono": "单色",
  "finish.look_silvertone": "银色调",
- "finish.look_noir": "黑色电影"
+ "finish.look_noir": "黑色电影",
+ "finish.tr_speed": "切换速度",
+ "finish.speed_fast": "快",
+ "finish.speed_normal": "普通",
+ "finish.speed_slow": "慢",
+ "finish.zoom_amount": "缩放强度",
+ "finish.zoom_none": "无",
+ "finish.zoom_slow": "轻微",
+ "finish.zoom_normal": "普通",
+ "finish.zoom_strong": "强",
+ "finish.zoom_focus": "缩放位置",
+ "finish.focus_face": "脸部（上）",
+ "finish.focus_center": "中央",
+ "finish.focus_left": "左",
+ "finish.focus_right": "右",
+ "finish.focus_bottom": "下",
+ "finish.focus_auto": "自动变化"
 }

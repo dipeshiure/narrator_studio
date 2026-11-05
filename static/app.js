@@ -71,6 +71,7 @@ $('#sys-refresh').addEventListener('click', loadSettings);
 
 // ---- finishing look: pick a filter; saved on the server and applied to every video
 let FIN = null, finSave = null;
+const FIN_SEGS = ['art', 'transition', 'transition_speed', 'zoom_amount', 'zoom_focus'];
 const LOOK_ORDER = ['original', 'vivid', 'vivid_warm', 'vivid_cool', 'dramatic', 'dramatic_warm', 'dramatic_cool',
                     'mono', 'silvertone', 'noir', 'warm', 'cool', 'cinema', 'sepia'];
 function paintFinish(first = false) {
@@ -86,7 +87,7 @@ function paintFinish(first = false) {
     });
   }
   $$('#fin-looks button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.look === FIN.look)));
-  $$('#fin-art button, #fin-transition button').forEach(b => b.setAttribute('aria-pressed', String(FIN[b.parentElement.id === 'fin-art' ? 'art' : 'transition'] === b.dataset.v)));
+  FIN_SEGS.forEach(k => $$('#fin-' + k + ' button').forEach(b => b.setAttribute('aria-pressed', String(FIN[k] === b.dataset.v))));
 }
 async function loadFinish() { FIN = await api('/api/finish'); paintFinish(true); }
 function changeFinish(patch) {
@@ -98,9 +99,8 @@ function changeFinish(patch) {
   }, 300);
 }
 $('#fin-looks').addEventListener('click', e => { const b = e.target.closest('button'); if (b) changeFinish({ look: b.dataset.look, saturation: 1, contrast: 1, brightness: 0, warmth: 0 }); });
-$('#fin-art').addEventListener('click', e => { const b = e.target.closest('button'); if (b) changeFinish({ art: b.dataset.v }); });
-$('#fin-transition').addEventListener('click', e => { const b = e.target.closest('button'); if (b) changeFinish({ transition: b.dataset.v }); });
-$('#fin-reset').addEventListener('click', () => changeFinish({ look: 'original', saturation: 1, contrast: 1, brightness: 0, warmth: 0, art: 'mono', transition: 'crosszoom' }));
+FIN_SEGS.forEach(k => $('#fin-' + k).addEventListener('click', e => { const b = e.target.closest('button'); if (b) changeFinish({ [k]: b.dataset.v }); }));
+$('#fin-reset').addEventListener('click', () => changeFinish({ look: 'original', saturation: 1, contrast: 1, brightness: 0, warmth: 0, art: 'mono', transition: 'crosszoom', transition_speed: 'normal', zoom_amount: 'normal', zoom_focus: 'face' }));
 
 // ---------------------------------------------------------------- navigation
 let current = 'story';
