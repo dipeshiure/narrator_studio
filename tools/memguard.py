@@ -1,5 +1,5 @@
 """Pause heavy GPU work while the Mac is short of memory, so it never has to swap
-(swap = writes to the SSD). Imported by flux_batch.py and dia_batch.py (stdlib only)."""
+(swap = writes to the SSD). Imported by flux_batch.py and cosy_batch.py (stdlib only)."""
 import contextlib
 import fcntl
 import json
@@ -27,7 +27,7 @@ GPU_LOCK = Path(__file__).resolve().parents[1] / "tmp" / "gpu.lock"
 
 @contextlib.contextmanager
 def gpu_lock():
-    """Only one GPU-heavy process at a time (FLUX or Dia, never both): held for the whole
+    """Only one GPU-heavy process at a time (FLUX or CosyVoice, never both): held for the whole
     batch, across processes (the 台本 page's voice sample, a render, a manual run)."""
     GPU_LOCK.parent.mkdir(parents=True, exist_ok=True)
     with open(GPU_LOCK, "w") as lk:

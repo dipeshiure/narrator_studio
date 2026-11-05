@@ -48,12 +48,11 @@ FPS = 30
 GAP = 0.35            # silence between scenes (s)
 
 STORY_DEFAULTS = {
-    "tts_engine": "edge",            # edge (free neural voices) / dia (Dia-1.6B on this Mac) / say
-    "dia_seed": 33,                  # dia: which invented speaker (33 / 21 / 64 are male voices)
+    "tts_engine": "cosy",            # cosy (CosyVoice 2 on this Mac) / edge (free neural voices) / say
+    "voice_id": "atlas",             # cosy: the narrator (assets/voices or media/voices)
     "voice": "en-US-GuyNeural",
     "tts_rate": "+0%",
-    "tts_quality": "stable",         # dia: "stable" (up to 5 tries per chunk) / "fast" (2): faster, the voice may wander more
-    "tts_speed": 1.0,                # speaking speed as a multiplier (1.0 = normal): edge rate and Dia tempo
+    "tts_speed": 1.0,                # speaking speed as a multiplier (1.0 = normal): edge rate and CosyVoice tempo
     "tts_pitch": "+0Hz",             # lower = deeper voice, e.g. "-6Hz"
     "visuals": "stock",              # stock (Pexels) / ai (ink illustrations, illustrate.py) / folder (your own media)
     "media_folder": "",              # folder: your clips / photos, matched to each paragraph by meaning (media_match.py)
@@ -496,31 +495,27 @@ def tts(text, dest, s, voice):
     return words
 
 
-# ---------------------------------------------------------------- Dia-1.6B (local TTS)
+# ---------------------------------------------------------------- narrator voices (CosyVoice 2)
 
-DIA_PY = HERE / "tools" / "dia_venv" / "bin" / "python"
-DIA_BATCH = HERE / "tools" / "dia_batch.py"
-DIA_REFS = mv.TMP / "dia_refs"           # one reference clip per seed = the video's voice
-DIA_SETUP = ("uv venv --python 3.11 tools/dia_venv && "
-             "uv pip install --python tools/dia_venv/bin/python mlx-audio librosa")
-DIA_VOICES = {33: "男性・低い", 21: "男性・落ち着いた", 64: "男性・やや高め"}
-DIA_NAMES = {33: "Atlas", 21: "Orion", 64: "Sage"}      # the built-in speakers are picked by name
-MY_VOICES = mv.MEDIA / "voices"        # recorded voices: <id>.wav + <id>.json {name, text}
+MY_VOICES = mv.MEDIA / "voices"            # voices the user recorded: <id>.wav + <id>.json {name, text}
+ASSET_VOICES = HERE / "assets" / "voices"  # built-in male voices that ship with the tool (Atlas, Orion, Titan)
+DEFAULT_VOICE = "atlas"
 
 
 def my_voice(vid):
-    """(wav, info) of a recorded voice, or None (also for ids that are not plain names)."""
-    if not vid or not re.fullmatch(r"[a-z0-9]{6,16}", str(vid)):
+    """(wav, info) of a built-in or recorded voice, or None (also for ids that are not plain names)."""
+    if not vid or not re.fullmatch(r"[a-z0-9]{4,16}", str(vid)):
         return None
-    wav, meta = MY_VOICES / f"{vid}.wav", MY_VOICES / f"{vid}.json"
-    if not (wav.exists() and meta.exists()):
-        return None
-    return wav, json.loads(meta.read_text())
+    for d in (MY_VOICES, ASSET_VOICES):
+        wav, meta = d / f"{vid}.wav", d / f"{vid}.json"
+        if wav.exists() and meta.exists():
+            return wav, json.loads(meta.read_text())
+    return None
 
 
 def voice_label(s):
-    mine = my_voice(s.get("dia_voice"))
-    return f"Dia {mine[1]['name']}" if mine else f"Dia {DIA_NAMES.get(int(s.get('dia_seed', 33)), s.get('dia_seed', 33))}"
+    mine = my_voice(s.get("voice_id")) or my_voice(DEFAULT_VOICE)
+    return f"CosyVoice 2 {mine[1]['name']}" if mine else "CosyVoice 2"
 
 
 COSY_PY = HERE / "tools" / "cosyvoice_venv" / "bin" / "python"
@@ -538,19 +533,13 @@ def cosy_available():
 
 def cosy_voice(scenes, wavs, s, log=print):
     """Voice every scene without a wav with CosyVoice 2 (tools/cosy_batch.py): one reference clip for
-    the whole video (the user's recorded voice, else Dia's seed-33 clip), then word timings."""
+    the whole video (a built-in or recorded voice), then word timings."""
     todo = [(sc, w) for sc, w in zip(scenes, wavs) if not w.exists()]
     if todo:
-        mine = my_voice(s.get("dia_voice"))
-        if mine:
-            ref, ref_text = str(mine[0]), mine[1]["text"]
-        else:
-            ref = DIA_REFS / f"dia_seed{int(s.get('dia_seed', 33))}.wav"
-            if not ref.exists():
-                ref = DIA_REFS / "dia_seed33.wav"
-            ref_text = COSY_REF_TEXT
-        if not Path(ref).exists():
-            raise RuntimeError("CosyVoice の見本の声がありません。先に Dia の声(seed 33)の試聴を 1 回押してください")
+        mine = my_voice(s.get("voice_id")) or my_voice(DEFAULT_VOICE)
+        if not mine:
+            raise RuntimeError("声の見本がありません(assets/voices/atlas.wav)")
+        ref, ref_text = str(mine[0]), mine[1]["text"]
         job = wavs[0].parent / "cosy_job.json"
         mv.write_json(job, {"repo": str(COSY_REPO), "model": str(COSY_MODEL), "ref_audio": str(ref),
                             "ref_text": ref_text, "speed": float(s.get("tts_speed", 1.0)),
@@ -573,62 +562,11 @@ def cosy_voice(scenes, wavs, s, log=print):
     write_words(scenes, wavs)
 
 
-def dia_available():
-    return DIA_PY.exists() and DIA_BATCH.exists()
-
-
-def dia_voice(scenes, wavs, s, log=print):
-    """Voice every scene without a wav in one Dia run (tools/dia_batch.py), then time the
-    words with Whisper and put the script's own spelling back on them."""
-    todo = [(sc, w) for sc, w in zip(scenes, wavs) if not w.exists()]
-    if True:                                       # always: dia_batch also checks every scene sounds like the same voice
-        job = wavs[0].parent / "dia_job.json"
-        spec = {"seed": int(s.get("dia_seed", 33)), "ref_dir": str(DIA_REFS), "speed": float(s.get("tts_speed", 1.0)),
-                "tries": 2 if s.get("tts_quality") == "fast" else 5,
-                "decode_bits": 4 if s.get("tts_quality") == "fast" else 8,
-                "items": [{"text": sc["text"], "out": str(w)} for sc, w in zip(scenes, wavs)]}
-        mine = my_voice(s.get("dia_voice"))
-        if mine:                                   # the user's recorded voice is the speaker
-            spec.update(ref_audio=str(mine[0]), ref_text=mine[1]["text"])
-        mv.write_json(job, spec)
-        log(f"  ナレーションを作成中(Dia・この Mac で生成): {len(todo)} 段落" if todo else "  ナレーションの声がそろっているか確認しています")
-        proc = subprocess.Popen([str(DIA_PY), str(DIA_BATCH), str(job)], cwd=HERE,
-                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        tail, shown, warns = [], -1, 0
-        for line in proc.stdout:
-            if line.startswith("TTS "):
-                done, total = map(int, line.split()[1:3])
-                if done * 10 // max(1, total) > shown:
-                    shown = done * 10 // max(1, total)
-                    log(f"  ナレーション {done}/{total}")
-            elif line.startswith("MEMWAIT"):
-                log("  メモリの空きが少ないので一時停止しています(スワップを防ぐため)。ほかのアプリを閉じると再開します")
-            elif line.startswith("GPUWAIT"):
-                log("  ほかの重い処理(声または絵)が終わるのを待っています(同時には動かしません)")
-            elif line.startswith("MEMOK"):
-                log("  メモリが空いたので再開しました")
-            elif line.startswith("REPAIR"):
-                n = line.split(":")[1].split(" of ")[0].strip()
-                log(f"  声が他と違う場面 {n} 個を作り直しています(声をそろえるため)")
-            elif line.startswith("WARN"):
-                warns += 1
-                if "unclear" in line:
-                    log("  ! 聞き取りにくい文が残りました: " + line.split("on:", 1)[-1].strip()[:50])
-            elif line.strip() and not line.startswith("REF"):
-                tail = (tail + [line.strip()])[-4:]
-        if proc.wait() != 0:
-            raise RuntimeError("Dia でナレーションを作れませんでした: " + " / ".join(tail[-2:]))
-        if warns:
-            log(f"  ! {warns} か所で声の高さがお手本からずれたままです(聞いて確認してください)")
-        job.unlink(missing_ok=True)
-    write_words(scenes, wavs)
-
-
 def write_words(scenes, wavs):
     """Per-scene word timings (Whisper), carrying the script's own spelling."""
     for sc, w in zip(scenes, wavs):
         wj = w.with_suffix(".words.json")
-        hj = w.with_suffix(".heard.json")             # timed by dia_batch on the GPU, else Whisper here
+        hj = w.with_suffix(".heard.json")             # Whisper timings
         if not wj.exists():
             heard = mv.read_json(hj, None) or mv.whisper_words(w, "base")   # timing only: spelling from the script
             mv.write_json(wj, script_words(sc["text"], [(x["w"], x["s"], x["e"]) for x in heard]) or None)
@@ -864,7 +802,7 @@ def write_publish(data, chapters, dest_md, dest_json, video=None):
 def make_story(script, outdir, s, log=print):
     """Render one script; models loaded on the way are released afterwards (the server
     keeps running between videos, so they would otherwise stay in memory)."""
-    # one heavy render at a time on this Mac (Dia, FLUX, Whisper and CLIP all share the
+    # one heavy render at a time on this Mac (CosyVoice, FLUX, Whisper and CLIP all share the
     # 24 GB of unified memory; two at once is what pushed it deep into swap)
     lock = mv.TMP / "heavy.lock"
     lk = open(lock, "w")
@@ -896,33 +834,24 @@ def _make_story(script, outdir, s, log=print):
     scenes = data["scenes"]
     voice = data.get("voice") or s["voice"]
     log(f"== {data['title']}  ({len(scenes)} シーン, 声: "
-        f"{voice_label(s) if s['tts_engine'] == 'dia' else 'CosyVoice 2' if s['tts_engine'] == 'cosy' else voice})")
+        f"{voice_label(s) if s['tts_engine'] == 'cosy' else voice})")
 
     # 1. narration, one file per scene (cached by text+voice)
     parts, t, heads, chapters = [], 0.0, [], []
     silence = work / "gap.wav"
     mv.run(["ffmpeg", "-y", "-f", "lavfi", "-i", f"anullsrc=r=44100:cl=mono", "-t", str(GAP), str(silence)])
     engine = s["tts_engine"]
-    if engine == "dia" and not dia_available():
-        log("  ! Dia の準備ができていないので、edge-tts の声で作ります")
-        engine = "edge"
     if engine == "cosy" and not cosy_available():
         log("  ! CosyVoice の準備ができていないので、edge-tts の声で作ります")
         engine = "edge"
-    mine = my_voice(s.get("dia_voice")) if engine == "dia" else None
     if engine == "cosy":
-        mine_c = my_voice(s.get("dia_voice"))
-        vkey = f"cosy{(s['dia_voice'] + str(int(mine_c[0].stat().st_mtime))) if mine_c else s.get('dia_seed', 33)}s{float(s.get('tts_speed', 1)):.2f}"
+        mine = my_voice(s.get("voice_id")) or my_voice(DEFAULT_VOICE)
+        vkey = f"cosy{s.get('voice_id') or DEFAULT_VOICE}{int(mine[0].stat().st_mtime) if mine else 0}s{float(s.get('tts_speed', 1)):.2f}"
     else:
-        vkey = None
-    vkey = vkey or (f"my{s['dia_voice']}{int(mine[0].stat().st_mtime)}" if mine else
-            f"dia{s.get('dia_seed', 33)}{'' if abs(float(s.get('tts_speed', 1)) - 1) < .01 else 's%.2f' % float(s['tts_speed'])}" if engine == "dia" else voice + s["tts_rate"] + s.get("tts_pitch", "+0Hz"))
+        vkey = voice + s["tts_rate"] + s.get("tts_pitch", "+0Hz")
     wavs = [work / f"v{i:03d}_{mv.hashlib.md5((vkey + sc['text']).encode()).hexdigest()[:10]}.wav"
             for i, sc in enumerate(scenes)]
-    if engine == "dia":
-        mv.memory_gate(log)
-        dia_voice(scenes, wavs, s, log)
-    elif engine == "cosy":
+    if engine == "cosy":
         mv.memory_gate(log)
         cosy_voice(scenes, wavs, s, log)
     for i, (sc, wav) in enumerate(zip(scenes, wavs)):

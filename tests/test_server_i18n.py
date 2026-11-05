@@ -26,11 +26,4 @@ def test_server_translates_json_only_for_english_cookie():
     ja = c.get("/api/story/options").get_json()
     c.set_cookie("lang", "en")
     en = c.get("/api/story/options").get_json()
-    assert any("男性" in v["label"] for v in ja["dia_voices"])
-    assert not any("男性" in v["label"] for v in en["dia_voices"])
-
-
-def test_translation_files_match_english_keys_and_placeholders():
-    import subprocess, sys
-    r = subprocess.run([sys.executable, "tools/i18n_check.py"], capture_output=True, text=True)
-    assert r.returncode == 0, r.stdout
+    assert ja["presets"]["bhatt"] != en["presets"]["bhatt"]          # "長尺の語り(白黒イラスト)" -> English

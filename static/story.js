@@ -5,8 +5,8 @@
   const PRESETS = {
     bhatt: {
       hint: t('js.story.bhatt_hint'),
-      o: { tts: 'dia', dia_seed: 33, voice: 'en-US-ChristopherNeural', speed: 0.92, pitch: -4, visuals: 'ai', aspect: '16:9', grain: true,
-           headings: false, tts_quality: 'stable', engine: 'kinetic', kc_preset: 'bhatt', kc_font: '', kc_accent_font: '', kc_size: 1.0,
+      o: { tts: 'cosy', voice_id: 'atlas', voice: 'en-US-ChristopherNeural', speed: 0.92, pitch: -4, visuals: 'ai', aspect: '16:9', grain: true,
+           headings: false, engine: 'kinetic', kc_preset: 'bhatt', kc_font: '', kc_accent_font: '', kc_size: 1.0,
            bgm: true, mood: 'dark' },
     },
   };
@@ -26,18 +26,18 @@
     const o = st.o;
     seg('story-preset', st.preset); seg('story-visuals', o.visuals); seg('story-aspect', o.aspect);
     seg('story-engine', o.engine); seg('story-kc-preset', o.kc_preset); seg('story-mood', o.mood);
-    seg('story-style', st.style); seg('story-tts-quality', o.tts_quality || 'stable'); seg('story-minutes', st.minutes);
+    seg('story-style', st.style); seg('story-minutes', st.minutes);
     $('#story-preset-hint').textContent = PRESETS[st.preset].hint;
     $('#story-voice').value = o.voice;
-    const dia = o.tts === 'dia' || o.tts === 'cosy';          // both clone a reference voice
-    seg('story-tts', o.tts === 'cosy' ? 'cosy' : dia ? 'dia' : 'edge');
-    $('#story-voice').hidden = dia; $('#story-dia-voice').hidden = !dia;
-    $('#story-dia-voice').value = o.dia_voice ? 'v:' + o.dia_voice : String(o.dia_seed || 33);
-    $$('.story-dia').forEach(el => el.hidden = !dia);
-    $$('.story-edge').forEach(el => el.hidden = dia);
+    const cosy = o.tts === 'cosy';
+    seg('story-tts', cosy ? 'cosy' : 'edge');
+    $('#story-voice').hidden = cosy; $('#story-voice-id').hidden = !cosy;
+    $('#story-voice-id').value = o.voice_id || 'atlas';
+    $$('.story-cosy').forEach(el => el.hidden = !cosy);
+    $$('.story-edge').forEach(el => el.hidden = cosy);
     const th = $('#story-tts-hint');
-    if (dia && opts && !opts.dia_ready) { th.className = 'hint status-warn'; th.textContent = t('js.story.dia_missing') + ': ' + opts.dia_setup; }
-    else if (dia) { th.className = 'hint'; th.textContent = t('js.story.dia_hint'); }
+    if (cosy && opts && !opts.cosy_ready) { th.className = 'hint status-warn'; th.textContent = t('js.story.cosy_missing') + ': ' + opts.cosy_setup; }
+    else if (cosy) { th.className = 'hint'; th.textContent = t('js.story.cosy_hint'); }
     else { th.className = 'hint'; th.textContent = t('js.story.edge_hint'); }
 
     $('#story-rate').value = o.speed; $('#o-story-rate').textContent = o.speed.toFixed(2) + '×';
@@ -194,6 +194,9 @@
              ...(PRESETS[saved.preset] ? {} : { preset: 'bhatt' }),
              ...(['bhatt', 'motivation'].includes(saved.style) ? {} : { style: 'bhatt' }),
              o: { ...PRESETS.bhatt.o, hero: '', ...(saved.o || {}) } };
+      if (st.o.tts === 'dia' || !st.o.tts) st.o.tts = 'cosy';                                  // Dia was removed
+      if (!st.o.voice_id) st.o.voice_id = st.o.dia_voice || ({ 21: 'orion', 18: 'titan' })[st.o.dia_seed] || 'atlas';
+      st.o = Object.fromEntries(Object.entries(st.o).filter(([k]) => !['dia_seed', 'dia_voice', 'tts_quality'].includes(k)));
       if (typeof st.o.speed !== 'number') st.o.speed = Math.max(0.6, Math.min(1.4, 1 + (Number(st.o.rate) || 0) / 100));   // old % setting
       delete st.o.rate;
       if (!['kinetic', 'simple', 'off'].includes(st.o.engine)) st.o.engine = 'kinetic';   // SubtitleFX was removed
@@ -202,8 +205,7 @@
     }
     try {
       opts = await api('/api/story/options');
-      const dv = $('#story-dia-voice');
-      fillDiaVoices(opts.my_voices || []);
+      fillVoices(opts.voices || []);
       const v = $('#story-voice');
       if (!v.options.length) v.innerHTML = opts.voices.map(x => `<option value="${x.id}">${x.label}</option>`).join('');
       const sel = $('#story-saved');
@@ -225,23 +227,18 @@
   onSeg('story-engine', v => set('engine', v));
   onSeg('story-kc-preset', v => set('kc_preset', v));
   onSeg('story-mood', v => set('mood', v));
-  onSeg('story-tts-quality', v => set('tts_quality', v));
   onSeg('story-style', v => { st.style = v; saveState(); paint(); });
   onSeg('story-minutes', v => { st.minutes = Number(v); saveState(); paint(); });
   $('#story-voice').addEventListener('change', e => set('voice', e.target.value));
-  $('#story-dia-voice').addEventListener('change', e => {
-    const v = e.target.value;
-    if (v.startsWith('v:')) set('dia_voice', v.slice(2));
-    else { st.o.dia_voice = ''; set('dia_seed', Number(v)); }
-  });
+  $('#story-voice-id').addEventListener('change', e => set('voice_id', e.target.value));
 
   // ------------------------------------------------------------ my voices (recorded reference)
-  function fillDiaVoices(mine) {
-    const dv = $('#story-dia-voice');
-    if (st.o.dia_voice && !mine.some(v => v.id === st.o.dia_voice)) st.o.dia_voice = '';   // deleted
-    dv.innerHTML = (opts.dia_voices || []).map(x => `<option value="${x.seed}">${x.name} — ${x.label}</option>`).join('')
+  function fillVoices(all) {
+    const builtin = all.filter(v => v.builtin), mine = all.filter(v => !v.builtin);
+    if (!all.some(v => v.id === st.o.voice_id)) st.o.voice_id = 'atlas';                       // removed voice
+    $('#story-voice-id').innerHTML = builtin.map(v => `<option value="${v.id}">${esc(v.name)}${v.desc ? ' — ' + esc(v.desc) : ''}</option>`).join('')
       + (mine.length ? `<optgroup label="${esc(t('js.voice.mine'))}">` + mine.map(v =>
-        `<option value="v:${v.id}">${esc(v.name)}</option>`).join('') + '</optgroup>' : '');
+        `<option value="${v.id}">${esc(v.name)}</option>`).join('') + '</optgroup>' : '');
     $('#my-voice-list').innerHTML = mine.map(v => `<li>
         <span class="batch-title">${esc(v.name)}</span><span class="video-meta">${v.seconds || ''} s</span>
         <button class="icon-btn" data-play="${v.id}" aria-label="${esc(t('js.voice.play', { name: v.name }))}" title="${esc(t('js.voice.play', { name: v.name }))}"><svg width="18" height="18" aria-hidden="true"><use href="#i-play"/></svg></button>
@@ -252,7 +249,7 @@
     const play = e.target.closest('[data-play]'), del = e.target.closest('[data-del]');
     if (play) { const a = $('#story-voice-audio'); a.src = `/api/story/voices/${play.dataset.play}/audio`; a.play(); }
     if (del && confirm(t('js.voice.del_confirm'))) {
-      try { fillDiaVoices((await api(`/api/story/voices/${del.dataset.del}/delete`, { method: 'POST' })).voices); saveState(); }
+      try { fillVoices((await api(`/api/story/voices/${del.dataset.del}/delete`, { method: 'POST' })).voices); saveState(); }
       catch (err) { toast(err.message); }
     }
   });
@@ -266,7 +263,7 @@
     const btn = $('#my-voice-add'); btn.disabled = true; toast(t('js.voice.adding'));
     try {
       const r = await api('/api/story/voices', { method: 'POST', body: fd });
-      opts.my_voices = r.voices; st.o.dia_voice = r.id; saveState(); fillDiaVoices(r.voices);
+      opts.voices = r.voices; st.o.voice_id = r.id; saveState(); fillVoices(r.voices);
       $('#my-voice-file').value = ''; $('#my-voice-name').value = ''; $('#my-voice-text').value = '';
       toast(t('js.voice.added'));
     } catch (e) { toast(e.message); }
@@ -376,7 +373,7 @@
     const btn = $('#story-voice-play'); btn.disabled = true;
     try {
       const res = await fetch('/api/story/voice-sample', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ engine: st.o.tts === 'cosy' ? 'dia' : st.o.tts === 'dia' ? 'dia' : 'edge', seed: st.o.dia_seed || 33, voice_id: st.o.dia_voice || '',
+        body: JSON.stringify({ engine: st.o.tts === 'cosy' ? 'cosy' : 'edge', voice_id: st.o.voice_id || 'atlas',
                                voice: st.o.voice, rate: ratePct(st.o.speed), pitch: signed(st.o.pitch, 'Hz') }) });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
       const a = $('#story-voice-audio'); a.src = URL.createObjectURL(await res.blob()); await a.play();
@@ -407,7 +404,7 @@
   // the 仕上がり panel as server options — shared by "動画を作る" and the batch
   function storyOptions() {
     const o = st.o;
-    return { tts_engine: o.tts === 'cosy' ? 'cosy' : o.tts === 'dia' ? 'dia' : 'edge', dia_seed: o.dia_seed || 33, dia_voice: o.dia_voice || '', tts_quality: o.tts_quality || 'stable', voice: o.voice, tts_rate: ratePct(o.speed), tts_speed: o.speed, tts_pitch: signed(o.pitch, 'Hz'),
+    return { tts_engine: o.tts === 'cosy' ? 'cosy' : 'edge', voice_id: o.voice_id || 'atlas', voice: o.voice, tts_rate: ratePct(o.speed), tts_speed: o.speed, tts_pitch: signed(o.pitch, 'Hz'),
              visuals: o.visuals, hero: o.hero || '', media_folder: o.media_folder || '', aspect: o.aspect, grain: o.grain,
              show_headings: o.headings, subs: o.engine !== 'off',
              subs_engine: o.engine === 'off' ? 'simple' : o.engine,

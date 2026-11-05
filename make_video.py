@@ -336,7 +336,7 @@ def whisper_model(name):
     return _whisper[name]
 
 
-# Whisper on the Apple GPU (mlx-audio in tools/dia_venv): same weights, ~10x faster than
+# Whisper on the Apple GPU (mlx-audio in tools/dia_venv, the folder keeps its old name): same weights, ~10x faster than
 # openai-whisper on the CPU (2 min of speech: small 4 s vs 41 s, base 3 s vs 17 s on an M5).
 # MV_STT=cpu forces the CPU path; any failure falls back to it.
 GPU_STT_PY = HERE / "tools" / "dia_venv" / "bin" / "python"
@@ -447,7 +447,7 @@ KC_SETUP = "uv venv --python 3.11 kinetic_captions/.venv && uv pip install --pyt
 
 
 # ---------------------------------------------------------------- memory guard
-# Everything heavy (Dia, FLUX, Whisper, CLIP, the local LLM) shares the Mac's unified
+# Everything heavy (CosyVoice, FLUX, Whisper, CLIP, the local LLM) shares the Mac's unified
 # memory. Running short means swap, i.e. writes to the SSD; these helpers keep the
 # heavy steps from starting while memory is low and unload the LLM before them.
 

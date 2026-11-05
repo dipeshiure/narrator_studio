@@ -1,6 +1,6 @@
 # Narrator Studio
 
-台本を入れるだけで、この Mac の中で声（Dia）・白黒の劇画風イラスト（FLUX.2 klein）・動く字幕（kinetic-captions）・BGM まで入った語り動画を作るツールです。録音した音声から作ることもできます。
+台本を入れるだけで、この Mac の中で声（CosyVoice 2）・白黒の劇画風イラスト（FLUX.2 klein）・動く字幕（kinetic-captions）・BGM まで入った語り動画を作るツールです。録音した音声から作ることもできます。
 
 ## 起動
 

@@ -401,7 +401,7 @@ def system_status():
         ollama = True
     except Exception:
         ollama = shutil.which("ollama") is not None
-    parts = [("dia", "Dia-1.6B", story.dia_available()), ("flux", "FLUX.2 klein 4B", illustrate.available()),
+    parts = [("cosy", "CosyVoice 2", story.cosy_available()), ("flux", "FLUX.2 klein 4B", illustrate.available()),
              ("kinetic", "kinetic-captions", mv.kinetic_available()), ("ollama", "Ollama", ollama),
              ("pexels", "Pexels", mv.has_pexels_key())]
     pw = subprocess.run(["pmset", "-g"], capture_output=True, text=True).stdout
@@ -522,7 +522,7 @@ STORY_PRESETS = {"bhatt": "長尺の語り(白黒イラスト)"}
 STORY_KEYS = {"voice", "tts_rate", "tts_pitch", "visuals", "aspect", "subs", "subs_engine", "kc_preset",
               "kc_font", "kc_size", "kc_position", "bgm", "bgm_mood", "bgm_volume",
               "hero", "image_seconds", "grain", "show_headings", "offline", "media_folder",
-              "tts_engine", "dia_seed", "dia_voice", "kc_accent_font", "tts_speed", "tts_quality"}
+              "tts_engine", "voice_id", "kc_accent_font", "tts_speed"}
 VOICE_SAMPLE = ("You were not built to quit. Every scar you carry is proof that you survived "
                 "what was meant to break you.")
 SIGNED = re.compile(r"^[+-]\d{1,3}(%|Hz)$")
@@ -539,18 +539,16 @@ def story_settings(body):
     for k in ("tts_rate", "tts_pitch"):
         if not SIGNED.match(str(s.get(k, ""))):
             s[k] = story.STORY_DEFAULTS[k]
-    if s.get("tts_engine") not in ("edge", "dia", "cosy", "say"):
-        s["tts_engine"] = "edge"
-    if s.get("tts_quality") not in ("stable", "fast"):
-        s["tts_quality"] = "stable"
+    if s.get("tts_engine") == "dia":
+        s["tts_engine"] = "cosy"                     # Dia was removed
+    if s.get("tts_engine") not in ("cosy", "edge", "say"):
+        s["tts_engine"] = "cosy"
     try:
         s["tts_speed"] = max(0.5, min(1.5, float(s.get("tts_speed", 1.0))))
     except (TypeError, ValueError):
         s["tts_speed"] = 1.0
-    try:
-        s["dia_seed"] = int(s.get("dia_seed", 33))
-    except (TypeError, ValueError):
-        s["dia_seed"] = 33
+    if not story.my_voice(s.get("voice_id")):
+        s["voice_id"] = story.DEFAULT_VOICE
     return preset, s
 
 
@@ -570,9 +568,8 @@ def story_options():
         "voices": VOICES, "presets": STORY_PRESETS, "styles": list(story.STYLES),
         "defaults": {k: v for k, v in story_settings({"preset": "bhatt"})[1].items() if k in STORY_KEYS},
         "kinetic_ready": mv.kinetic_available(), "kinetic_setup": mv.KC_SETUP,
-        "dia_ready": story.dia_available(), "dia_setup": story.DIA_SETUP,
-        "dia_voices": [{"seed": k, "name": story.DIA_NAMES[k], "label": v} for k, v in story.DIA_VOICES.items()],
-        "my_voices": voice_list(),
+        "cosy_ready": story.cosy_available(), "cosy_setup": story.COSY_SETUP,
+        "voices": voice_list(),
         "ai_ready": illustrate.available(), "ai_setup": illustrate.SETUP, "ai_downloading": downloading,
         "scripts": [script_info(p) for p in scripts[:100]],
     })
@@ -621,8 +618,8 @@ def story_draft():
 def story_voice_sample():
     import asyncio, story
     body = request.get_json(silent=True) or {}
-    if body.get("engine") == "dia":
-        return dia_sample(body)
+    if body.get("engine") in ("cosy", "dia"):
+        return cosy_sample(body)
     voice = body.get("voice") if body.get("voice") in {v["id"] for v in VOICES} else VOICES[0]["id"]
     rate = body.get("rate") if SIGNED.match(str(body.get("rate", ""))) else "+0%"
     pitch = body.get("pitch") if SIGNED.match(str(body.get("pitch", ""))) else "+0Hz"
@@ -637,56 +634,46 @@ def story_voice_sample():
     return send_file(out, mimetype="audio/mpeg")
 
 
-def dia_sample(body):
-    """The Dia reference clip of a seed = exactly the voice the video will use."""
+def cosy_sample(body):
+    """The sample line read by CosyVoice 2 in the chosen voice = what the video will sound like."""
     import story
-    if not story.dia_available():
-        return jsonify({"error": "Dia が入っていません: " + story.DIA_SETUP}), 400
-    try:
-        seed = int(body.get("seed", 33))
-    except (TypeError, ValueError):
-        seed = 33
-    mine = story.my_voice(body.get("voice_id"))
-    if mine:                                   # a recorded voice: let Dia read the sample line with it
-        out = mv.TMP / "voice_samples" / f"my_{body['voice_id']}_{int(mine[0].stat().st_mtime)}.wav"
-        if not out.exists():
-            out.parent.mkdir(parents=True, exist_ok=True)
-            job = mv.TMP / f"dia_sample_my_{body['voice_id']}.json"
-            mv.write_json(job, {"seed": seed, "ref_dir": str(story.DIA_REFS), "ref_audio": str(mine[0]),
-                                "ref_text": mine[1]["text"], "items": [{"text": VOICE_SAMPLE, "out": str(out)}]})
-            r = subprocess.run([str(story.DIA_PY), str(story.DIA_BATCH), str(job)], cwd=HERE,
-                               capture_output=True, text=True)
-            job.unlink(missing_ok=True)
-            if not out.exists():
-                return jsonify({"error": "声を作れませんでした: " + (r.stderr or r.stdout)[-300:]}), 502
-        return send_file(out, mimetype="audio/wav")
-    ref = story.DIA_REFS / f"dia_seed{seed}.wav"
-    if not ref.exists():                       # first time: make the reference (~30 s)
-        job = mv.TMP / f"dia_sample_{seed}.json"
-        mv.write_json(job, {"seed": seed, "ref_dir": str(story.DIA_REFS), "items": []})
-        r = subprocess.run([str(story.DIA_PY), str(story.DIA_BATCH), str(job)], cwd=HERE,
+    if not story.cosy_available():
+        return jsonify({"error": "CosyVoice が入っていません: " + story.COSY_SETUP}), 400
+    vid = body.get("voice_id") or story.DEFAULT_VOICE
+    mine = story.my_voice(vid)
+    if not mine:
+        return jsonify({"error": "声が見つかりません"}), 404
+    out = mv.TMP / "voice_samples" / f"cosy_{vid}_{int(mine[0].stat().st_mtime)}.wav"
+    if not out.exists():
+        out.parent.mkdir(parents=True, exist_ok=True)
+        job = mv.TMP / f"cosy_sample_{vid}.json"
+        mv.write_json(job, {"repo": str(story.COSY_REPO), "model": str(story.COSY_MODEL), "ref_audio": str(mine[0]),
+                            "ref_text": mine[1]["text"], "speed": 1.0, "items": [{"text": VOICE_SAMPLE, "out": str(out)}]})
+        r = subprocess.run([str(story.COSY_PY), str(story.COSY_BATCH), str(job)], cwd=HERE,
                            capture_output=True, text=True)
         job.unlink(missing_ok=True)
-        if not ref.exists():
+        if not out.exists():
             return jsonify({"error": "声を作れませんでした: " + (r.stderr or r.stdout)[-300:]}), 502
-    return send_file(ref, mimetype="audio/wav")
+    return send_file(out, mimetype="audio/wav")
 
 
-# ------------------------------------------------------------------ my voices (Dia reference)
+# ------------------------------------------------------------------ narrator voices (built-in + recorded)
 # A short recording of a voice the user may use (their own, or one they have permission for)
-# becomes the narrator: Dia gets it + its words as the prompt for every chunk.
+# becomes a narrator: CosyVoice 2 gets it + its words as the reference for every scene.
 VOICE_MIN, VOICE_MAX = 3.0, 15.0          # seconds kept from the recording
 
 
 def voice_list():
+    """Built-in voices (assets/voices) first, then the user's own (media/voices, oldest first)."""
     import story
     out = []
-    for meta in sorted(story.MY_VOICES.glob("*.json"), key=lambda p: p.stat().st_mtime):
-        vid = meta.stem
-        mine = story.my_voice(vid)
-        if mine:
-            out.append({"id": vid, "name": mine[1]["name"], "text": mine[1]["text"],
-                        "seconds": mine[1].get("seconds")})
+    for d in (story.ASSET_VOICES, story.MY_VOICES):
+        for meta in sorted(d.glob("*.json"), key=lambda p: (p.stat().st_mtime if d == story.MY_VOICES else p.name)):
+            mine = story.my_voice(meta.stem)
+            if mine and not any(v["id"] == meta.stem for v in out):
+                out.append({"id": meta.stem, "name": mine[1]["name"], "desc": mine[1].get("desc", ""),
+                            "text": mine[1]["text"], "seconds": mine[1].get("seconds"),
+                            "builtin": bool(mine[1].get("builtin"))})
     return out
 
 
@@ -752,8 +739,11 @@ def story_voice_audio(vid):
 @app.post("/api/story/voices/<vid>/delete")
 def story_voice_delete(vid):
     import story
-    if not story.my_voice(vid):
+    mine = story.my_voice(vid)
+    if not mine:
         abort(404)
+    if mine[1].get("builtin"):
+        return jsonify({"error": "最初から入っている声は削除できません"}), 400
     for p in (story.MY_VOICES / f"{vid}.wav", story.MY_VOICES / f"{vid}.json"):
         p.unlink(missing_ok=True)
     return jsonify({"voices": voice_list()})

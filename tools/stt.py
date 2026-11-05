@@ -1,4 +1,4 @@
-"""Word-timed transcription on the Apple GPU (Whisper via mlx-audio; runs in tools/dia_venv).
+"""Word-timed transcription on the Apple GPU (Whisper via mlx-audio; runs in tools/dia_venv, whose name is historical).
 
     tools/dia_venv/bin/python tools/stt.py <model id> <audio> [<audio> ...]
 
