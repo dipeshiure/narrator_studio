@@ -287,7 +287,7 @@ def draft_script(theme, minutes=10, style="bhatt", s=None, log=print):
     minutes = max(1, min(60, int(minutes)))
     n = max(1, min(10, round(minutes / 5)))
     words = int(minutes * 140 / n)
-    voice = STYLES.get(style, STYLES["bhatt"])
+    voice = (s or {}).get("draft_voice") or STYLES.get(style, STYLES["bhatt"])      # a genre brings its own voice
     log(f"台本の構成を作っています({minutes} 分 / {n} 章)")
     outline = json.loads(_ollama(
         f"Plan a YouTube video script: {voice}\nTheme: {theme}\n"
@@ -1086,6 +1086,8 @@ def load_story_settings(preset):
         if not p.exists():
             raise SystemExit(f"プリセットがありません: {p}")
         s.update(mv.read_json(p, {}))
+    if s["art"] == "genre":
+        s["art"] = s.get("art_default", "mono")        # follow the genre (ink for motivation, colour for space ...)
     if s["art"] == "color":
         s["saturation"] = 1.0                          # the ink preset greys every picture: colour needs it back
     return s

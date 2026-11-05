@@ -582,5 +582,20 @@
  "finish.focus_left": "왼쪽",
  "finish.focus_right": "오른쪽",
  "finish.focus_bottom": "아래",
- "finish.focus_auto": "자동으로 바꾸기"
+ "finish.focus_auto": "자동으로 바꾸기",
+ "genre.title": "장르",
+ "genre.bhatt": "동기부여",
+ "genre.space": "우주·SF",
+ "genre.history": "역사",
+ "genre.nature": "자연·동물",
+ "genre.mystery": "미스터리",
+ "genre.science": "과학 해설",
+ "genre.fantasy": "판타지",
+ "finish.art_genre": "장르에 맞추기",
+ "js.genre.hint_space": "우주 이야기: 별·행성·우주선을 선명한 영화 같은 그림으로 그립니다.",
+ "js.genre.hint_history": "역사: 그 시대의 사람·건물·풍경을 유화풍 그림으로 그립니다.",
+ "js.genre.hint_nature": "자연·동물: 동물과 풍경을 다큐멘터리 사진풍으로 그립니다.",
+ "js.genre.hint_mystery": "미스터리·공포: 안개·그림자·낡은 집으로 긴장감을 흑백으로 그립니다.",
+ "js.genre.hint_science": "과학 해설: 원리와 실험을 밝고 알기 쉬운 그림으로 그립니다.",
+ "js.genre.hint_fantasy": "판타지: 성·드래곤·마법을 웅장한 그림으로 그립니다."
 }

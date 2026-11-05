@@ -44,6 +44,8 @@ T = {
     "Ryan(英国)": "Ryan (UK)",
     "Thomas(英国)": "Thomas (UK)",
     "長尺の語り(白黒イラスト)": "Long narration (B&W illustrations)",
+    "モチベーション(白黒)": "Motivation (B&W)", "宇宙・SF": "Space & sci-fi", "歴史": "History", "自然・動物": "Nature & animals",
+    "ミステリー・怖い話": "Mystery & scary stories", "科学・解説": "Science explainer", "ファンタジー": "Fantasy",
     "テーマを入力してください": "Enter a theme",
     "下書きができました。読んで直してから「動画を作る」を押してください": "Draft ready. Read and edit it, then press \"Make video\"",
     "声を作れませんでした(ネット接続を確認してください): {e}": "Couldn't make the voice (check your internet connection): {e}",

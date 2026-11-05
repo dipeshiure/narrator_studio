@@ -100,7 +100,7 @@ function changeFinish(patch) {
 }
 $('#fin-looks').addEventListener('click', e => { const b = e.target.closest('button'); if (b) changeFinish({ look: b.dataset.look, saturation: 1, contrast: 1, brightness: 0, warmth: 0 }); });
 FIN_SEGS.forEach(k => $('#fin-' + k).addEventListener('click', e => { const b = e.target.closest('button'); if (b) changeFinish({ [k]: b.dataset.v }); }));
-$('#fin-reset').addEventListener('click', () => changeFinish({ look: 'original', saturation: 1, contrast: 1, brightness: 0, warmth: 0, art: 'mono', transition: 'crosszoom', transition_speed: 'normal', zoom_amount: 'normal', zoom_focus: 'face' }));
+$('#fin-reset').addEventListener('click', () => changeFinish({ look: 'original', saturation: 1, contrast: 1, brightness: 0, warmth: 0, art: 'genre', transition: 'crosszoom', transition_speed: 'normal', zoom_amount: 'normal', zoom_focus: 'face' }));
 
 // ---------------------------------------------------------------- navigation
 let current = 'story';

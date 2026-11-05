@@ -556,7 +556,8 @@ VOICES = [  # edge-tts (free). Deep / calm voices first: they suit long-form nar
     {"id": "en-GB-RyanNeural", "label": "Ryan(英国)"},
     {"id": "en-GB-ThomasNeural", "label": "Thomas(英国)"},
 ]
-STORY_PRESETS = {"bhatt": "長尺の語り(白黒イラスト)"}
+STORY_PRESETS = {"bhatt": "モチベーション(白黒)", "space": "宇宙・SF", "history": "歴史", "nature": "自然・動物",
+                 "mystery": "ミステリー・怖い話", "science": "科学・解説", "fantasy": "ファンタジー"}
 STORY_KEYS = {"voice", "tts_rate", "tts_pitch", "visuals", "aspect", "subs", "subs_engine", "kc_preset",
               "kc_font", "kc_size", "kc_position", "bgm", "bgm_mood", "bgm_volume",
               "hero", "image_seconds", "grain", "show_headings", "offline", "media_folder",
@@ -573,6 +574,8 @@ def story_settings(body):
     s = story.load_story_settings(preset)
     for k, v in (body.get("options") or {}).items():
         if k in STORY_KEYS and v is not None:
+            if k == "hero" and not str(v).strip():
+                continue                                 # empty = keep the genre's own (none, or the default hero)
             s[k] = v
     for k in ("tts_rate", "tts_pitch"):
         if not SIGNED.match(str(s.get(k, ""))):
@@ -643,9 +646,10 @@ def story_draft():
         return jsonify({"error": "テーマを入力してください"}), 400
     minutes = max(1, min(60, int(body.get("minutes") or 10)))
     style = body.get("style") if body.get("style") in story.STYLES else "bhatt"
+    _, gs = story_settings({"preset": body.get("preset")})        # the genre brings its own narration voice
 
     def work(log):
-        text, meta = story.draft_script(theme, minutes, style, log=log)
+        text, meta = story.draft_script(theme, minutes, style, s=gs, log=log)
         lines = text.splitlines()
         log("下書きができました。読んで直してから「動画を作る」を押してください")
         return {"title": lines[0].strip(), "text": "\n".join(lines[1:]).strip(), **meta}

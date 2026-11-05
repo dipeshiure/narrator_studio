@@ -582,5 +582,20 @@
  "finish.focus_left": "Gauche",
  "finish.focus_right": "Droite",
  "finish.focus_bottom": "Bas",
- "finish.focus_auto": "Varier"
+ "finish.focus_auto": "Varier",
+ "genre.title": "Genre",
+ "genre.bhatt": "Motivation",
+ "genre.space": "Espace et science-fiction",
+ "genre.history": "Histoire",
+ "genre.nature": "Nature et animaux",
+ "genre.mystery": "Mystère",
+ "genre.science": "Vulgarisation scientifique",
+ "genre.fantasy": "Fantasy",
+ "finish.art_genre": "Selon le genre",
+ "js.genre.hint_space": "Histoires de l'espace : étoiles, planètes et vaisseaux en images vives et cinématographiques.",
+ "js.genre.hint_history": "Histoire : personnes, bâtiments et paysages de l'époque façon peinture à l'huile.",
+ "js.genre.hint_nature": "Nature et animaux : faune et paysages comme des photos de documentaire.",
+ "js.genre.hint_mystery": "Mystère et peur : brouillard, ombres et vieilles maisons en noir et blanc plein de suspense.",
+ "js.genre.hint_science": "Science : le mécanisme ou l'expérience en images claires et lumineuses.",
+ "js.genre.hint_fantasy": "Fantasy : châteaux, dragons et magie en images épiques."
 }

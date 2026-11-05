@@ -15,7 +15,7 @@
       window.applyTheme = apply; apply(); mq.addEventListener('change', apply);
     })();
   </script>
-  <link rel="stylesheet" href="/static/styles.css?v=20261105h">
+  <link rel="stylesheet" href="/static/styles.css?v=20261105i">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -305,7 +305,7 @@
                 <div class="field"><label for="story-theme" data-i18n="story.15">テーマ</label>
                   <input id="story-theme" class="input" maxlength="300" placeholder="例: Why the strongest men walk alone / 誘惑に勝つ男の生き方" data-i18n-attr="placeholder:story.1"></div>
                 <div class="row" style="flex-wrap:wrap;gap:16px;align-items:flex-end">
-                  <div class="field" style="margin:0"><span class="label" id="l-story-style" data-i18n="story.16">語り口</span>
+                  <div class="field" id="story-style-field" style="margin:0"><span class="label" id="l-story-style" data-i18n="story.16">語り口</span>
                     <div class="segmented" role="group" aria-labelledby="l-story-style" id="story-style">
                       <button data-v="bhatt" aria-pressed="true" data-i18n="story.17">静かな説教調</button><button data-v="motivation" data-i18n="story.18">熱いスピーチ</button></div></div>
                   <div class="field" style="margin:0"><span class="label" id="l-story-min" data-i18n="story.19">長さ</span>
@@ -357,9 +357,11 @@
         <div class="card" id="story-settings">
           <div class="card-head"><h2 data-i18n="story.45">仕上がり</h2><span class="video-meta" data-i18n="story.46">この動画だけの設定</span></div>
 
-          <div class="field"><span class="label" id="l-story-preset" data-i18n="story.47">スタイル</span>
-            <div class="segmented" role="group" aria-labelledby="l-story-preset" id="story-preset" hidden>
-              <button data-v="bhatt" data-i18n="story.48">長尺の語り(白黒)</button></div>
+          <div class="field"><span class="label" id="l-story-preset" data-i18n="genre.title">ジャンル</span>
+            <div class="segmented seg-grid" role="group" aria-labelledby="l-story-preset" id="story-preset">
+              <button data-v="bhatt" data-i18n="genre.bhatt">モチベーション</button><button data-v="space" data-i18n="genre.space">宇宙・SF</button><button data-v="history" data-i18n="genre.history">歴史</button>
+              <button data-v="nature" data-i18n="genre.nature">自然・動物</button><button data-v="mystery" data-i18n="genre.mystery">ミステリー</button><button data-v="science" data-i18n="genre.science">科学・解説</button>
+              <button data-v="fantasy" data-i18n="genre.fantasy">ファンタジー</button></div>
             <span class="hint" id="story-preset-hint"></span></div>
 
           <details class="group" open><summary><span data-i18n="story.49">声</span><svg width="18" height="18"><use href="#i-down"/></svg></summary>
@@ -623,7 +625,7 @@
             <div class="field"><span class="label" id="l-fin-look" data-i18n="finish.look">フィルター</span>
               <div class="look-grid" role="group" aria-labelledby="l-fin-look" id="fin-looks"></div></div>
             <div class="field"><span class="label" id="l-fin-art" data-i18n="finish.art">AI イラストの色</span>
-              <div class="segmented" role="group" aria-labelledby="l-fin-art" id="fin-art"><button data-v="mono" data-i18n="finish.art_mono">白黒(墨)</button><button data-v="color" data-i18n="finish.art_color">カラー</button></div></div>
+              <div class="segmented" role="group" aria-labelledby="l-fin-art" id="fin-art"><button data-v="genre" data-i18n="finish.art_genre">ジャンルに合わせる</button><button data-v="mono" data-i18n="finish.art_mono">白黒(墨)</button><button data-v="color" data-i18n="finish.art_color">カラー</button></div></div>
             <div class="field"><span class="label" id="l-fin-tr" data-i18n="finish.transition">絵の切り替え</span>
               <div class="segmented" role="group" aria-labelledby="l-fin-tr" id="fin-transition"><button data-v="crosszoom" data-i18n="finish.tr_cross">クロスズーム</button><button data-v="cut" data-i18n="finish.tr_cut">カット</button></div></div>
             <div class="field" data-fin-zoom><span class="label" id="l-fin-ts" data-i18n="finish.tr_speed">切り替えの速さ</span>
@@ -657,12 +659,12 @@
   <div class="modal-body" id="post-modal-body"></div>
 </dialog>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
-<script src="/static/i18n.js?v=20261105h"></script>
-<script src="/static/app.js?v=20261105h"></script>
-<script src="/static/inbox.js?v=20261105h"></script>
-<script src="/static/posts.js?v=20261105h"></script>
-<script src="/static/rights.js?v=20261105h"></script>
-<script src="/static/story.js?v=20261105h"></script>
-<script src="/static/fonts.js?v=20261105h"></script>
+<script src="/static/i18n.js?v=20261105i"></script>
+<script src="/static/app.js?v=20261105i"></script>
+<script src="/static/inbox.js?v=20261105i"></script>
+<script src="/static/posts.js?v=20261105i"></script>
+<script src="/static/rights.js?v=20261105i"></script>
+<script src="/static/story.js?v=20261105i"></script>
+<script src="/static/fonts.js?v=20261105i"></script>
 </body>
 </html>

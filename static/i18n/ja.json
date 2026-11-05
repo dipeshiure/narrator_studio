@@ -588,5 +588,20 @@
  "finish.focus_left": "左",
  "finish.focus_right": "右",
  "finish.focus_bottom": "下",
- "finish.focus_auto": "自動で変える"
+ "finish.focus_auto": "自動で変える",
+ "genre.title": "ジャンル",
+ "genre.bhatt": "モチベーション",
+ "genre.space": "宇宙・SF",
+ "genre.history": "歴史",
+ "genre.nature": "自然・動物",
+ "genre.mystery": "ミステリー",
+ "genre.science": "科学・解説",
+ "genre.fantasy": "ファンタジー",
+ "finish.art_genre": "ジャンルに合わせる",
+ "js.genre.hint_space": "宇宙の話。星・惑星・宇宙船などを、色鮮やかな映画のような絵で描きます。",
+ "js.genre.hint_history": "歴史の話。その時代の人・建物・風景を、油絵のような絵で描きます。",
+ "js.genre.hint_nature": "自然・動物の話。動物や景色を、ドキュメンタリー写真のような絵で描きます。",
+ "js.genre.hint_mystery": "ミステリー・怖い話。霧・影・古い家などで、気配を白黒で描きます。",
+ "js.genre.hint_science": "科学の解説。仕組みや実験を、明るくわかりやすい絵で描きます。",
+ "js.genre.hint_fantasy": "ファンタジー。城・ドラゴン・魔法などを、壮大な絵で描きます。"
 }

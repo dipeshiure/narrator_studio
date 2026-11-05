@@ -588,5 +588,20 @@
  "finish.focus_left": "Left",
  "finish.focus_right": "Right",
  "finish.focus_bottom": "Bottom",
- "finish.focus_auto": "Vary it"
+ "finish.focus_auto": "Vary it",
+ "genre.title": "Genre",
+ "genre.bhatt": "Motivation",
+ "genre.space": "Space & sci-fi",
+ "genre.history": "History",
+ "genre.nature": "Nature & animals",
+ "genre.mystery": "Mystery",
+ "genre.science": "Science explainer",
+ "genre.fantasy": "Fantasy",
+ "finish.art_genre": "Match the genre",
+ "js.genre.hint_space": "Space stories: stars, planets and spacecraft in vivid cinematic pictures.",
+ "js.genre.hint_history": "History: the people, buildings and landscapes of the era as oil-painting style pictures.",
+ "js.genre.hint_nature": "Nature and animals: wildlife and landscapes as documentary-style photographs.",
+ "js.genre.hint_mystery": "Mystery and scary stories: fog, shadows and old houses in suspenseful black and white.",
+ "js.genre.hint_science": "Science explainers: the mechanism or experiment in bright, clear pictures.",
+ "js.genre.hint_fantasy": "Fantasy: castles, dragons and magic as epic pictures."
 }

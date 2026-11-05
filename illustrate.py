@@ -41,7 +41,10 @@ FRAMING = "the whole head fully visible, subject centred, nothing cropped at the
 
 
 def style_for(s):
-    return COLOR_STYLE if s.get("art") == "color" else STYLE
+    """The genre's own look (config/presets/<genre>.json) for the chosen colour mode, else the ink default."""
+    if s.get("art") == "color":
+        return s.get("style_color") or COLOR_STYLE
+    return s.get("style_mono") or STYLE
 
 
 HERO = "a stoic young man with short black hair and a long dark coat"
@@ -157,12 +160,13 @@ def _ask_json(prompt, model):
                        "messages": [{"role": "user", "content": prompt}]}).encode()
     req = urllib.request.Request(prep.OLLAMA, body, {"Content-Type": "application/json"})
     out = json.loads(json.load(urllib.request.urlopen(req, timeout=300))["message"]["content"])
-    if isinstance(out, dict):
-        out = next((v for v in out.values() if isinstance(v, list)), [])
+    if isinstance(out, dict):             # {"pictures": [...]} as asked, or {"1": "...", "image2": "..."} as small models do
+        out = next((v for v in out.values() if isinstance(v, list)), None) or \
+            [v for v in out.values() if isinstance(v, (str, dict))]
     return [clean(x if isinstance(x, str) else next(iter(x.values()), "") if isinstance(x, dict) else str(x)) for x in out]
 
 
-def llm_prompts(scenes, hero, model, log=print):
+def llm_prompts(scenes, hero, model, log=print, hint=""):
     """One visual description per scene from the local LLM (None when it fails). Scenes go in small
     batches, each with the paragraph before and after for context, and the picture must SHOW what
     the words say; the image model then spends its attention on that subject, not on a stock symbol."""
@@ -181,21 +185,24 @@ def llm_prompts(scenes, hero, model, log=print):
         prompt = (
             "You direct the illustrations of a black-and-white motivational video. For each numbered narration "
             "paragraph write ONE picture (20-35 English words) that SHOWS what the words are saying at that moment: "
-            "its main idea made concrete as a person doing, feeling or facing something, or the literal object, "
-            "place or situation the words mention (a mirror, a door, a clock before dawn, a man alone in a forest, "
-            "hands in prayer, a cliff edge). Name the subject first, then pose, place, light. The main character is "
-            f"'{hero}'; use him when a person is needed, otherwise show the thing itself. Do not fall back on a "
-            "generic storm, lion or mountain unless the paragraph is about it. Every picture must be different. "
-            "Only what is visible; no names of real people, no existing anime/manga/film characters, no text in the image."
+            "its main idea made concrete: the literal object, place, creature or situation the words mention, or a "
+            "person doing, feeling or facing something. Name the subject first, then pose, place, light. "
+            + (f"The recurring main character is '{hero}'; use him when a person is needed, otherwise show the thing itself. "
+               if hero else "There is no recurring character: show the subject itself. ")
+            + (f"Genre guidance: {hint} " if hint else "")
+            + "Do not fall back on a stock symbol unless the paragraph is about it. Every picture must be different. "
+            "Only what is visible; no names of real people, no existing anime/manga/film characters. Never describe text, numbers, labels, scale bars, "
+            "charts, maps with writing, signs or captions: the picture must contain no writing at all."
             + (f"\nThe paragraph before (context only): {before}" if before else "")
             + (f"\nThe paragraph after (context only): {after}" if after else "")
-            + f"\nAnswer as a JSON list of exactly {len(batch)} strings, one per numbered paragraph.\n\n{numbered}")
+            + f"\nAnswer as JSON: {{\"pictures\": [exactly {len(batch)} strings, one per numbered paragraph, in order]}}.\n\n{numbered}")
         got = None
         for _ in range(2):                                   # one retry per batch
             try:
                 got = _ask_json(prompt, model)
                 if len(got) == len(batch) and all(got):
                     break
+                log(f"  ! 絵の指示文の数が合いません({len(got)}/{len(batch)})。もう一度頼みます")
             except Exception as e:
                 log(f"  ! 絵の指示文の作成に失敗({e})")
             got = None
@@ -213,14 +220,14 @@ def llm_prompts(scenes, hero, model, log=print):
 def keyword_prompt(sc, hero):
     import story
     q = sc.get("query") or story.keyword_query(sc["text"], ["lonely road at night"])
-    return f"{hero}, {q}, moody atmosphere"
+    return f"{hero}, {q}, moody atmosphere" if hero else f"{q}, atmospheric"
 
 
 def plan(scenes, s, log=print):
     """Fill sc['image_prompt'] for every scene (script value > LLM > keywords)."""
-    hero = clean(s.get("hero") or HERO)
+    hero = "" if s.get("hero") == "none" else clean(s.get("hero") or HERO)      # "none": no recurring character
     need = [i for i, sc in enumerate(scenes) if not sc.get("image_prompt")]
-    got = llm_prompts([scenes[i] for i in need], hero, s["llm_model"], log) if need else None
+    got = llm_prompts([scenes[i] for i in need], hero, s["llm_model"], log, s.get("planner_hint", "")) if need else None
     for j, i in enumerate(need):
         scenes[i]["image_prompt"] = got[j] if got and got[j] else keyword_prompt(scenes[i], hero)
     for sc in scenes:
@@ -260,7 +267,7 @@ def illustrate(scenes, s, log=print):
         t0 += sc["dur"] + 0.35
         for k in range(n):
             shot = SHOTS[(i + k) % len(SHOTS)] if n > 1 or i % 2 else SHOTS[0]
-            prompt = f"{sc['image_prompt']}, {shot}, {FRAMING}, {style_for(s)}"
+            prompt = f"{sc['image_prompt']}, {shot}, {FRAMING}, {style_for(s)}" if s.get("hero") != "none" else f"{sc['image_prompt']}, {shot}, {style_for(s)}"
             seed = int(hashlib.md5(f"{prompt}|{k}".encode()).hexdigest()[:7], 16)
             key = hashlib.md5(f"{name}|{w}x{h}|{prompt}|{seed}".encode()).hexdigest()[:16]
             out = CACHE / f"{key}.png"

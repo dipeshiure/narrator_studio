@@ -10,6 +10,13 @@
            bgm: true, mood: 'dark' },
     },
   };
+  // the other genres: same voice and layout, their own caption style and music mood (the picture look,
+  // narration voice and scene ideas come from config/presets/<genre>.json on the server)
+  const GENRE_O = { space: { mood: 'epic' }, history: { mood: 'epic' }, nature: { mood: 'uplifting' },
+                    mystery: { mood: 'dark' }, science: { mood: 'uplifting' }, fantasy: { mood: 'epic' } };
+  for (const [g, o] of Object.entries(GENRE_O)) {
+    PRESETS[g] = { hint: t('js.genre.hint_' + g), o: { ...PRESETS.bhatt.o, kc_preset: 'cinema', grain: g !== 'space' && g !== 'nature' && g !== 'science', speed: 1.0, pitch: 0, ...o } };
+  }
   let opts = null;          // /api/story/options
   let st = null;            // { title, text, preset, o: {...}, job, draft_job, style, minutes }
   let polling = null;
@@ -28,6 +35,7 @@
     seg('story-engine', o.engine); seg('story-kc-preset', o.kc_preset); seg('story-mood', o.mood);
     seg('story-style', st.style); seg('story-minutes', st.minutes);
     $('#story-preset-hint').textContent = PRESETS[st.preset].hint;
+    $('#story-style-field').hidden = st.preset !== 'bhatt';        // calm / fiery tone is for the motivation genre
     $('#story-voice').value = o.voice;
     const cosy = o.tts === 'cosy';
     seg('story-tts', cosy ? 'cosy' : 'edge');
@@ -387,7 +395,7 @@
     if ($('#story-text').value.trim() && !confirm(t('js.story.replace_ai'))) return;
     const btn = $('#story-draft'); btn.disabled = true;
     try {
-      const { job } = await api('/api/story/draft', { method: 'POST', body: { theme, minutes: st.minutes, style: st.style } });
+      const { job } = await api('/api/story/draft', { method: 'POST', body: { theme, minutes: st.minutes, style: st.style, preset: st.preset } });
       $('#story-status').textContent = t('js.story.writing'); $('#story-result').hidden = true;
       await new Promise(done => follow(job, j => {
         if (j.status === 'done') {

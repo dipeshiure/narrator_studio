@@ -55,5 +55,9 @@
     "chains"
   ],
   "kc_accent_font": "",
-  "image_model": "klein"
+  "image_model": "klein",
+  "art_default": "mono",
+  "label": "モチベーション(白黒)",
+  "planner_hint": "Use the recurring main character or a strong symbolic image (storm, lion, chains, mountain, empty road, burning candle, church light, chessboard, battlefield) when it fits the words.",
+  "draft_voice": ""
 }

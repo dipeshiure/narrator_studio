@@ -138,7 +138,7 @@ def save_settings(s, path=None):
 # One look for every video, applied once to the finished picture (captions drawn later are untouched).
 FINISH = CONF / "finish.json"
 FINISH_DEFAULTS = {"look": "original", "saturation": 1.0, "contrast": 1.0, "brightness": 0.0, "warmth": 0.0,
-                   "art": "mono",             # AI illustrations: "mono" (black-and-white ink) or "color"
+                   "art": "genre",            # AI illustrations: "genre" (the genre's own look), "mono" or "color"
                    "transition": "crosszoom",  # between pictures: "crosszoom" or "cut"
                    "zoom_amount": "normal",    # slow push-in inside a picture: none / slow / normal / strong
                    "zoom_focus": "face",       # where the zoom is anchored: face / center / left / right / bottom / auto
@@ -176,7 +176,7 @@ def load_finish():
             f[k] = max(lo, min(hi, float(f[k])))
         except (TypeError, ValueError):
             f[k] = FINISH_DEFAULTS[k]
-    f["art"] = f["art"] if f["art"] in ("mono", "color") else "mono"
+    f["art"] = f["art"] if f["art"] in ("genre", "mono", "color") else "genre"
     f["transition"] = f["transition"] if f["transition"] in ("crosszoom", "cut") else "crosszoom"
     f["zoom_amount"] = f["zoom_amount"] if f["zoom_amount"] in ZOOM_AMOUNT else "normal"
     f["zoom_focus"] = f["zoom_focus"] if f["zoom_focus"] in (*ZOOM_FOCUS, "auto") else "face"

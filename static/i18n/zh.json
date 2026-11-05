@@ -582,5 +582,20 @@
  "finish.focus_left": "左",
  "finish.focus_right": "右",
  "finish.focus_bottom": "下",
- "finish.focus_auto": "自动变化"
+ "finish.focus_auto": "自动变化",
+ "genre.title": "类型",
+ "genre.bhatt": "励志",
+ "genre.space": "宇宙·科幻",
+ "genre.history": "历史",
+ "genre.nature": "自然·动物",
+ "genre.mystery": "悬疑",
+ "genre.science": "科学讲解",
+ "genre.fantasy": "奇幻",
+ "finish.art_genre": "跟随类型",
+ "js.genre.hint_space": "宇宙故事：用鲜艳的电影感画面表现星星、行星和飞船。",
+ "js.genre.hint_history": "历史：用油画风画面表现那个时代的人物、建筑和风景。",
+ "js.genre.hint_nature": "自然·动物：用纪录片摄影风表现动物和风景。",
+ "js.genre.hint_mystery": "悬疑·恐怖：用雾、影子和老房子，以黑白营造气氛。",
+ "js.genre.hint_science": "科学讲解：用明亮清晰的画面表现原理和实验。",
+ "js.genre.hint_fantasy": "奇幻：用壮阔的画面表现城堡、龙和魔法。"
 }

@@ -247,3 +247,34 @@ def test_zoom_settings_and_cross_zoom_join(sandbox, tmp_path):
     mv.save_finish({**f, "zoom_amount": "slow", "zoom_focus": "right", "transition_speed": "slow"})
     s = story.load_story_settings("bhatt")
     assert (s["zoom_amount"], s["zoom_focus"], s["cross"]) == ("slow", "right", 1.5)
+
+
+def test_every_genre_preset_loads_with_its_own_look(sandbox):
+    import illustrate, server
+    seen = set()
+    for g in server.STORY_PRESETS:
+        s = story.load_story_settings(g)
+        assert s["planner_hint"] and s["art_default"] in ("mono", "color")
+        assert s["art"] in ("mono", "color")                       # "genre" resolves to the genre's own default
+        look = illustrate.style_for({**s, "art": "color"})
+        assert "no text" in look                                    # every look forbids drawn text
+        seen.add(look)
+        assert server.story_settings({"preset": g, "options": {"hero": ""}})[1]["hero"] == s["hero"]   # empty = keep the genre's
+    assert len(seen) == len(server.STORY_PRESETS)                   # all different
+    assert story.load_story_settings("space")["hero"] == "none"
+    assert story.load_story_settings("bhatt")["art"] == "mono"      # default 'genre': the ink look stays for motivation
+    assert story.load_story_settings("space")["art"] == "color"
+
+
+def test_planner_reads_small_model_answers(monkeypatch):
+    import illustrate, prep, json as _json, urllib.request as ur
+    monkeypatch.setattr(prep, "ensure_ollama", lambda log=print: None)
+
+    def fake(reply):
+        class R:
+            def read(self): return _json.dumps({"message": {"content": _json.dumps(reply)}}).encode()
+        monkeypatch.setattr(ur, "urlopen", lambda *a, **k: R())
+        return illustrate._ask_json("p", "m")
+    assert fake({"pictures": ["a", "b"]}) == ["a", "b"]
+    assert fake({"image1": "a", "image2": "b"}) == ["a", "b"]       # what qwen2.5 really answers
+    assert fake(["a", "b"]) == ["a", "b"]
