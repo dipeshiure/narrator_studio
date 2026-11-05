@@ -160,7 +160,11 @@ def main(path):
             print(f"WARN fast decode unavailable ({e}); using the standard path", flush=True)
             bits = 0
     if not ref.exists():               # also the voice sample on the 台本 page (items = [])
+        if bits:                       # the compiled path needs a reference clip: a first voice uses the standard one
+            dia_fast.uninstall(model)
         say(model, REF_TEXT, seed, ref_dir, f"dia_seed{seed}")
+        if bits:
+            dia_fast.install(model, bits)
     ref_hz, ref_cent, _, _ = voice_feat(ref)
     print(f"REF {ref_hz:.0f}", flush=True)
     stt = load_stt(STT)
