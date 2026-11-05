@@ -599,3 +599,9 @@ details.font-add { border: 1px solid var(--color-line); border-radius: var(--rad
 .voice-list { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 4px; }
 .voice-list li { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--color-line); }
 .voice-list .batch-title { flex: 1; }
+
+/* finishing filter card */
+.finish-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.finish-preview { margin: 0; position: sticky; top: 16px; }
+.finish-preview img { width: 100%; height: auto; border-radius: var(--radius-md); background: #000; display: block; aspect-ratio: 16 / 9; object-fit: cover; }
+@media (max-width: 900px) { .finish-grid { grid-template-columns: 1fr; } .finish-preview { position: static; } }

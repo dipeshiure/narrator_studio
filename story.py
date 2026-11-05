@@ -684,17 +684,53 @@ def render_photo(jpg, seconds, dest, s, n=0, trim=0.0):
     that FLUX draws in the corners)."""
     w, h = mv.frame_size(s)
     frames = max(1, round(seconds * FPS))
-    step = 0.10 / frames                               # 10 % zoom over the shot
-    z = f"1.10-{step}*on" if n % 2 else f"1.0+{step}*on"
-    x = ["iw/2-(iw/zoom/2)", "0", "iw-iw/zoom"][n % 3]
+    step = 0.06 / frames                               # 6 % zoom over the shot: gentle, faces stay whole
+    z = f"1.06-{step}*on" if n % 2 else f"1.0+{step}*on"
+    # the zoom is anchored near the top third (where heads are), so the face never slides out of frame;
+    # the horizontal anchor drifts a little from shot to shot
+    px = [0.5, 0.4, 0.6][n % 3]
+    x = f"(iw-iw/zoom)*{px}"
     cut = f"crop=iw*{1 - 2 * trim:.3f}:ih*{1 - 2 * trim:.3f}," if trim else ""
     vf = (f"{cut}scale={w * 2}:{h * 2}:force_original_aspect_ratio=increase,crop={w * 2}:{h * 2},"
-          f"zoompan=z='{z}':x='{x}':y='ih/2-(ih/zoom/2)':d={frames}:s={w}x{h}:fps={FPS},"
+          f"zoompan=z='{z}':x='{x}':y='(ih-ih/zoom)*0.30':d={frames}:s={w}x{h}:fps={FPS},"
           f"eq=contrast={s['contrast']}:brightness={s['brightness']}:saturation={s['saturation']}"
           + (",vignette=PI/4.5" if s.get("vignette") else "")
           + (",noise=alls=10:allf=t" if s.get("grain") else "") + ",format=yuv420p")
     mv.run(["ffmpeg", "-y", "-loop", "1", "-i", str(jpg), "-t", f"{seconds:.3f}", "-vf", vf,
             "-c:v", "h264_videotoolbox", "-b:v", s["bitrate"], str(dest)])
+
+
+CROSS = 0.4        # seconds two neighbouring pictures overlap in the cross zoom
+
+
+def join_crosszoom(segs, s, work, group=10):
+    """Join clips with ffmpeg's zoom-in cross transition. Every clip was rendered CROSS seconds longer
+    than its slot, so overlapping them keeps the timeline exactly where the narration expects it.
+    Done in groups of `group` clips (one small ffmpeg graph each), then the groups are joined the same way."""
+    def chain(clips, dest):
+        durs = [mv.duration(c) for c in clips]
+        if len(clips) == 1:
+            return clips[0]
+        cmd, graph, off = ["ffmpeg", "-y"], [], 0.0
+        for c in clips:
+            cmd += ["-i", str(c)]
+        prev = "[0:v]"
+        for i in range(1, len(clips)):
+            off += durs[i - 1] - CROSS
+            lab = f"[v{i}]"
+            graph.append(f"{prev}[{i}:v]xfade=transition=zoomin:duration={CROSS}:offset={max(off, 0):.3f}{lab}")
+            prev = lab
+        mv.run(cmd + ["-filter_complex", ";".join(graph), "-map", prev, "-r", str(FPS), "-pix_fmt", "yuv420p",
+                      "-c:v", "h264_videotoolbox", "-b:v", s["bitrate"], str(dest)])
+        return dest
+    level, tag = list(segs), 0
+    while len(level) > 1:
+        nxt = []
+        for k in range(0, len(level), group):
+            part = level[k:k + group]
+            nxt.append(chain(part, work / f"xf{tag}_{k // group:03d}.mp4") if len(part) > 1 else part[0])
+        level, tag = nxt, tag + 1
+    return level[0]
 
 
 def photo_shots(sc, used, log=print, shot=5.0):
@@ -896,11 +932,13 @@ def _make_story(script, outdir, s, log=print):
             art = illustrate.illustrate([sc for sc in scenes], s, log)
         else:
             log("  ! AI イラストのモデルがまだ準備できていないので、白黒の素材映像で作ります")
+    finish = mv.load_finish()                          # Settings: one look for every video
+    crosszoom = finish["transition"] == "crosszoom" and s.get("visuals") == "ai"
     grade, segs, first_clip = mv.grade_filter(s), [], None
     used_photos, credits, photo_credits = set(), [], []
     for i, sc in enumerate(scenes):
         if i in art and not sc.get("chart"):
-            each = sc["dur"] / len(art[i])
+            each = sc["dur"] / len(art[i]) + (CROSS if crosszoom else 0)    # cross-zoom overlaps clips by CROSS s
             for j, png in enumerate(art[i]):
                 seg = work / f"s{i:03d}_a{j:02d}.mp4"
                 pic = illustrate.trim_bands(png, work / f"s{i:03d}_a{j:02d}.png")   # no side bars
@@ -965,6 +1003,9 @@ def _make_story(script, outdir, s, log=print):
 
     # 3. subtitles (Whisper on our own narration) + section headings
     vf = f"fade=t=in:d={min(float(s['fade_in']), 1.0):.2f},fade=t=out:st={total - 1.0:.2f}:d=1.0"
+    look = mv.finish_filter(finish)
+    if look:
+        vf += "," + look
     words = []
     kinetic = s["subs"] and s["subs_engine"] == "kinetic"
     if s["subs"] or heads or credits:
@@ -988,6 +1029,9 @@ def _make_story(script, outdir, s, log=print):
             vf += f",ass={ass}"
 
     # 4. assemble with BGM under the voice
+    if crosszoom and len(segs) > 1:
+        log("  絵と絵のあいだをクロスズームでつないでいます...")
+        segs = [join_crosszoom(segs, s, work)]
     lst = work / "list.txt"
     lst.write_text("".join(f"file '{p}'\n" for p in segs))
     log("  最終エンコード中...")
@@ -1032,11 +1076,14 @@ def _make_story(script, outdir, s, log=print):
 
 def load_story_settings(preset):
     s = {**mv.load_settings(), **STORY_DEFAULTS}
+    s["art"] = mv.load_finish()["art"]                 # Settings: black-and-white ink or colour illustrations
     if preset:
         p = PRESETS / f"{preset}.json"
         if not p.exists():
             raise SystemExit(f"プリセットがありません: {p}")
         s.update(mv.read_json(p, {}))
+    if s["art"] == "color":
+        s["saturation"] = 1.0                          # the ink preset greys every picture: colour needs it back
     return s
 
 

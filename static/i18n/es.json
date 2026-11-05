@@ -543,5 +543,22 @@
  "story.cosy": "CosyVoice 2 (este Mac)",
  "settings.part_cosy": "Voz de la narración (creada en este Mac)",
  "js.story.cosy_missing": "CosyVoice no está instalado",
- "js.story.cosy_hint": "Crea una voz natural en la GPU de este Mac, copiando una voz de referencia (gratis). Todas las escenas usan la misma referencia, así que la voz se mantiene."
+ "js.story.cosy_hint": "Crea una voz natural en la GPU de este Mac, copiando una voz de referencia (gratis). Todas las escenas usan la misma referencia, así que la voz se mantiene.",
+ "finish.title": "Filtro de acabado",
+ "finish.hint": "El aspecto elegido aquí se aplica al final de <strong>todos los vídeos</strong> que hagas desde ahora. Para dar color a las imágenes en blanco y negro, usa «Aspecto» o «Color de las ilustraciones IA».",
+ "finish.look": "Aspecto",
+ "finish.look_original": "Original",
+ "finish.look_vivid": "Vivo",
+ "finish.look_warm": "Cálido",
+ "finish.look_cool": "Frío",
+ "finish.look_cinema": "Cine (turquesa y naranja)",
+ "finish.look_sepia": "Sepia",
+ "finish.warmth": "Calidez (− frío / + cálido)",
+ "finish.art": "Color de las ilustraciones IA",
+ "finish.art_mono": "Blanco y negro (tinta)",
+ "finish.art_color": "Color",
+ "finish.transition": "Transición entre imágenes",
+ "finish.tr_cross": "Zoom cruzado",
+ "finish.tr_cut": "Corte",
+ "finish.preview": "Vista previa (en imágenes en blanco y negro solo se ve el aspecto)"
 }

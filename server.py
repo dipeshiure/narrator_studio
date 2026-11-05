@@ -3,7 +3,7 @@
 Run:  venv/bin/python server.py      ->  http://localhost:8510
 Design system: design-system/motiversity-auto/MASTER.md
 """
-import glob, json, os, queue, re, shutil, subprocess, sys, threading, time, uuid
+import glob, hashlib, json, os, queue, re, shutil, subprocess, sys, threading, time, uuid
 from pathlib import Path
 from urllib.parse import quote
 
@@ -381,6 +381,40 @@ def save_settings():
 def reset_settings():
     mv.SETTINGS.unlink(missing_ok=True)
     return jsonify(mv.load_settings())
+
+
+# ------------------------------------------------------------------ finishing look (settings page)
+@app.get("/api/finish")
+def finish_get():
+    return jsonify({**mv.load_finish(), "looks": list(mv.LOOKS)})
+
+
+@app.post("/api/finish")
+def finish_save():
+    body = request.get_json(silent=True) or {}
+    f = {**mv.load_finish(), **{k: v for k, v in body.items() if k in mv.FINISH_DEFAULTS}}
+    mv.FINISH.parent.mkdir(exist_ok=True)
+    mv.save_finish(f)
+    return jsonify({**mv.load_finish(), "looks": list(mv.LOOKS)})
+
+
+@app.post("/api/finish/preview")
+def finish_preview():
+    """One illustration with the look applied (the settings in the request, not yet saved)."""
+    body = request.get_json(silent=True) or {}
+    f = {**mv.load_finish(), **{k: v for k, v in body.items() if k in mv.FINISH_DEFAULTS}}
+    cache = HERE / "media" / "ai_illustrations"
+    pics = sorted(cache.glob("*.png"), key=lambda p: p.stat().st_mtime, reverse=True)[:1] if cache.exists() else []
+    if not pics:
+        return jsonify({"error": "プレビュー用の絵がまだありません"}), 404
+    flt = mv.finish_filter(f)
+    key = hashlib.md5((pics[0].name + flt).encode()).hexdigest()[:12]
+    out = mv.TMP / "finish_preview" / f"{key}.jpg"
+    if not out.exists():
+        out.parent.mkdir(parents=True, exist_ok=True)
+        vf = "scale=640:-2" + ("," + flt if flt else "")
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(pics[0]), "-vf", vf, "-frames:v", "1", str(out)], check=True)
+    return send_file(out, mimetype="image/jpeg")
 
 
 # ------------------------------------------------------------------ system (settings page)

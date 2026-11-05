@@ -53,6 +53,7 @@ $('#set-theme').addEventListener('change', e => {
 $('#set-start').value = localStorage.getItem('start_page') || 'last';
 $('#set-start').addEventListener('change', e => { localStorage.setItem('start_page', e.target.value); toast(t('js.app.saved')); });
 async function loadSettings() {
+  loadFinish();
   loadKeyStatus();
   try {
     const r = await api('/api/system');
@@ -67,6 +68,38 @@ async function loadSettings() {
   } catch (e) { toast(e.message); }
 }
 $('#sys-refresh').addEventListener('click', loadSettings);
+
+// ---- finishing look: saved on the server, applied to every video
+let FIN = null, finTimer = null;
+const finSliders = { saturation: 2, contrast: 2, brightness: 2, warmth: 2 };
+function paintFinish() {
+  $('#fin-look').value = FIN.look;
+  for (const k of Object.keys(finSliders)) { $('#fin-' + k).value = FIN[k]; $('#o-fin-' + k).textContent = Number(FIN[k]).toFixed(2); }
+  $$('#fin-art button, #fin-transition button').forEach(b => b.setAttribute('aria-pressed', String(FIN[b.parentElement.id === 'fin-art' ? 'art' : 'transition'] === b.dataset.v)));
+  $('#fin-preview').src = '#';
+  clearTimeout(finTimer);
+  finTimer = setTimeout(async () => {                       // the preview is made by the same ffmpeg filter as the video
+    try {
+      const r = await fetch('/api/finish/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(FIN) });
+      if (r.ok) $('#fin-preview').src = URL.createObjectURL(await r.blob());
+    } catch { /* no preview picture yet */ }
+  }, 250);
+}
+async function loadFinish() { FIN = await api('/api/finish'); paintFinish(); }
+let finSave = null;
+function changeFinish(patch) {
+  FIN = { ...FIN, ...patch }; paintFinish();
+  clearTimeout(finSave);
+  finSave = setTimeout(async () => {
+    try { await api('/api/finish', { method: 'POST', body: FIN }); const b = $('#finish-saved'); b.hidden = false; setTimeout(() => b.hidden = true, 1500); }
+    catch (e) { toast(e.message); }
+  }, 400);
+}
+$('#fin-look').addEventListener('change', e => changeFinish({ look: e.target.value }));
+Object.keys(finSliders).forEach(k => $('#fin-' + k).addEventListener('input', e => changeFinish({ [k]: Number(e.target.value) })));
+$('#fin-art').addEventListener('click', e => { const b = e.target.closest('button'); if (b) changeFinish({ art: b.dataset.v }); });
+$('#fin-transition').addEventListener('click', e => { const b = e.target.closest('button'); if (b) changeFinish({ transition: b.dataset.v }); });
+$('#fin-reset').addEventListener('click', () => changeFinish({ look: 'original', saturation: 1, contrast: 1, brightness: 0, warmth: 0, art: 'mono', transition: 'crosszoom' }));
 
 // ---------------------------------------------------------------- navigation
 let current = 'story';

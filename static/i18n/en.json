@@ -549,5 +549,22 @@
  "story.cosy": "CosyVoice 2 (this Mac)",
  "settings.part_cosy": "Narration voice (made on this Mac)",
  "js.story.cosy_missing": "CosyVoice isn't installed",
- "js.story.cosy_hint": "Makes a natural voice on this Mac's GPU, copying a reference voice (free). Every scene uses the same reference, so the voice stays the same."
+ "js.story.cosy_hint": "Makes a natural voice on this Mac's GPU, copying a reference voice (free). Every scene uses the same reference, so the voice stays the same.",
+ "finish.title": "Finishing filter",
+ "finish.hint": "The look chosen here is applied at the end of <strong>every video</strong> you make from now on. To add colour to black-and-white pictures, use \"Look\" or \"AI illustration colour\".",
+ "finish.look": "Look",
+ "finish.look_original": "Original",
+ "finish.look_vivid": "Vivid",
+ "finish.look_warm": "Warm",
+ "finish.look_cool": "Cool",
+ "finish.look_cinema": "Cinema (teal & orange)",
+ "finish.look_sepia": "Sepia",
+ "finish.warmth": "Warmth (− cool / + warm)",
+ "finish.art": "AI illustration colour",
+ "finish.art_mono": "Black & white (ink)",
+ "finish.art_color": "Colour",
+ "finish.transition": "Picture transition",
+ "finish.tr_cross": "Cross zoom",
+ "finish.tr_cut": "Cut",
+ "finish.preview": "Preview (only the look shows on black-and-white pictures)"
 }

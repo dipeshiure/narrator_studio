@@ -32,8 +32,20 @@ STYLE = ("single full-bleed illustration filling the entire frame edge to edge, 
          "strong chiaroscuro shadows, high contrast monochrome, cinematic composition, "
          "dramatic lighting, detailed background, clean empty margins, no text, no letters, no writing, "
          "no handwriting, no signature, no page number, no logo, no caption, no speech bubbles, no watermark")
+COLOR_STYLE = ("single full-bleed illustration filling the entire frame edge to edge, no panels, no borders, no frames, "
+               "full colour manga illustration, rich vivid colours, clean line art, cinematic lighting, "
+               "detailed background, clean empty margins, no text, no letters, no writing, "
+               "no handwriting, no signature, no page number, no logo, no caption, no speech bubbles, no watermark")
+# faces must survive the slow zoom and the captions: whole head in frame, a little room above and below
+FRAMING = "the whole head fully visible, subject centred, nothing cropped at the frame edge"
+
+
+def style_for(s):
+    return COLOR_STYLE if s.get("art") == "color" else STYLE
+
+
 HERO = "a stoic young man with short black hair and a long dark coat"
-SHOTS = ["wide shot", "close-up", "low angle shot", "silhouette", "over the shoulder shot", "medium shot"]
+SHOTS = ["wide shot", "medium shot", "low angle shot", "silhouette", "over the shoulder shot", "medium wide shot"]
 
 # names of existing works / characters / artists never go into a prompt
 BANNED = re.compile(r"\b(" + "|".join([
@@ -248,7 +260,7 @@ def illustrate(scenes, s, log=print):
         t0 += sc["dur"] + 0.35
         for k in range(n):
             shot = SHOTS[(i + k) % len(SHOTS)] if n > 1 or i % 2 else SHOTS[0]
-            prompt = f"{sc['image_prompt']}, {shot}, {STYLE}"
+            prompt = f"{sc['image_prompt']}, {shot}, {FRAMING}, {style_for(s)}"
             seed = int(hashlib.md5(f"{prompt}|{k}".encode()).hexdigest()[:7], 16)
             key = hashlib.md5(f"{name}|{w}x{h}|{prompt}|{seed}".encode()).hexdigest()[:16]
             out = CACHE / f"{key}.png"

@@ -15,7 +15,7 @@
       window.applyTheme = apply; apply(); mq.addEventListener('change', apply);
     })();
   </script>
-  <link rel="stylesheet" href="/static/styles.css?v=20261105d">
+  <link rel="stylesheet" href="/static/styles.css?v=20261105e">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -615,6 +615,32 @@
           </div>
           <ul class="font-list" id="font-list"></ul>
       </div>
+      <div class="card" id="finish-card">
+        <div class="card-head"><h2 data-i18n="finish.title">仕上げのフィルター</h2><span class="badge" id="finish-saved" hidden data-i18n="upload.29">保存済み</span></div>
+        <p class="hint" style="font-size:12px;color:var(--color-muted-foreground);margin:0 0 12px" data-i18n="finish.hint">ここで決めた見た目は、これから作る<strong>すべての動画</strong>の最後(仕上げ)にかかります。白黒の絵に色を付けたいときは、下の「色味」か「絵の色」を使います。</p>
+        <div class="finish-grid">
+          <div class="finish-controls">
+            <div class="field"><label for="fin-look" data-i18n="finish.look">色味</label>
+              <select id="fin-look"><option value="original" data-i18n="finish.look_original">そのまま</option><option value="vivid" data-i18n="finish.look_vivid">あざやか</option>
+                <option value="warm" data-i18n="finish.look_warm">暖かい</option><option value="cool" data-i18n="finish.look_cool">冷たい</option>
+                <option value="cinema" data-i18n="finish.look_cinema">シネマ(青緑とオレンジ)</option><option value="sepia" data-i18n="finish.look_sepia">セピア</option></select></div>
+            <div class="field"><div class="range-head"><label for="fin-saturation" data-i18n="upload.8">彩度</label><output id="o-fin-saturation"></output></div>
+              <input type="range" id="fin-saturation" min="0" max="2" step="0.05"></div>
+            <div class="field"><div class="range-head"><label for="fin-contrast" data-i18n="upload.6">コントラスト</label><output id="o-fin-contrast"></output></div>
+              <input type="range" id="fin-contrast" min="0.6" max="1.6" step="0.05"></div>
+            <div class="field"><div class="range-head"><label for="fin-brightness" data-i18n="upload.7">明るさ</label><output id="o-fin-brightness"></output></div>
+              <input type="range" id="fin-brightness" min="-0.3" max="0.3" step="0.02"></div>
+            <div class="field"><div class="range-head"><label for="fin-warmth" data-i18n="finish.warmth">暖かさ(−冷たい / ＋暖かい)</label><output id="o-fin-warmth"></output></div>
+              <input type="range" id="fin-warmth" min="-1" max="1" step="0.05"></div>
+            <div class="field"><span class="label" id="l-fin-art" data-i18n="finish.art">AI イラストの色</span>
+              <div class="segmented" role="group" aria-labelledby="l-fin-art" id="fin-art"><button data-v="mono" data-i18n="finish.art_mono">白黒(墨)</button><button data-v="color" data-i18n="finish.art_color">カラー</button></div></div>
+            <div class="field"><span class="label" id="l-fin-tr" data-i18n="finish.transition">絵の切り替え</span>
+              <div class="segmented" role="group" aria-labelledby="l-fin-tr" id="fin-transition"><button data-v="crosszoom" data-i18n="finish.tr_cross">クロスズーム</button><button data-v="cut" data-i18n="finish.tr_cut">カット</button></div></div>
+            <div class="row" style="justify-content:space-between"><button class="btn btn-sm" id="fin-reset" data-i18n="upload.30">初期設定に戻す</button></div>
+          </div>
+          <figure class="finish-preview"><img id="fin-preview" alt="" width="640"><figcaption class="video-meta" data-i18n="finish.preview">見本(白黒の絵に色味だけ反映します)</figcaption></figure>
+        </div>
+      </div>
       <div class="card">
         <div class="card-head"><h2 data-i18n="settings.system">この Mac の状態</h2>
           <button class="btn btn-sm" id="sys-refresh"><svg width="16" height="16" aria-hidden="true"><use href="#i-refresh"/></svg><span data-i18n="settings.refresh">更新</span></button></div>
@@ -636,12 +662,12 @@
   <div class="modal-body" id="post-modal-body"></div>
 </dialog>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
-<script src="/static/i18n.js?v=20261105d"></script>
-<script src="/static/app.js?v=20261105d"></script>
-<script src="/static/inbox.js?v=20261105d"></script>
-<script src="/static/posts.js?v=20261105d"></script>
-<script src="/static/rights.js?v=20261105d"></script>
-<script src="/static/story.js?v=20261105d"></script>
-<script src="/static/fonts.js?v=20261105d"></script>
+<script src="/static/i18n.js?v=20261105e"></script>
+<script src="/static/app.js?v=20261105e"></script>
+<script src="/static/inbox.js?v=20261105e"></script>
+<script src="/static/posts.js?v=20261105e"></script>
+<script src="/static/rights.js?v=20261105e"></script>
+<script src="/static/story.js?v=20261105e"></script>
+<script src="/static/fonts.js?v=20261105e"></script>
 </body>
 </html>

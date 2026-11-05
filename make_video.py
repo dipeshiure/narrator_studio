@@ -134,6 +134,55 @@ def save_settings(s, path=None):
     write_json(path or SETTINGS, {k: s[k] for k in DEFAULTS if k in s})
 
 
+# ---------------------------------------------------------------- finishing look (Settings page)
+# One look for every video, applied once to the finished picture (captions drawn later are untouched).
+FINISH = CONF / "finish.json"
+FINISH_DEFAULTS = {"look": "original", "saturation": 1.0, "contrast": 1.0, "brightness": 0.0, "warmth": 0.0,
+                   "art": "mono",             # AI illustrations: "mono" (black-and-white ink) or "color"
+                   "transition": "crosszoom"}  # between pictures: "crosszoom" or "cut"
+LOOKS = {   # name -> (saturation x, contrast x, brightness +, warmth, extra ffmpeg filter)
+    "original": (1.0, 1.0, 0.0, 0.0, ""),
+    "vivid": (1.35, 1.08, 0.0, 0.0, ""),
+    "warm": (1.1, 1.03, 0.0, 0.45, ""),
+    "cool": (1.05, 1.03, 0.0, -0.45, ""),
+    "cinema": (1.15, 1.1, -0.02, 0.0, "colorbalance=rs=-0.12:gs=-0.02:bs=0.16:rh=0.16:gh=0.03:bh=-0.12"),
+    "sepia": (1.0, 1.05, 0.0, 0.0, "colorchannelmixer=.393:.769:.189:0:.349:.686:.168:0:.272:.534:.131"),
+}
+
+
+def load_finish():
+    saved = read_json(FINISH, {})
+    f = {**FINISH_DEFAULTS, **{k: v for k, v in saved.items() if k in FINISH_DEFAULTS}}
+    if f["look"] not in LOOKS:
+        f["look"] = "original"
+    for k, lo, hi in (("saturation", 0.0, 2.0), ("contrast", 0.6, 1.6), ("brightness", -0.3, 0.3), ("warmth", -1.0, 1.0)):
+        try:
+            f[k] = max(lo, min(hi, float(f[k])))
+        except (TypeError, ValueError):
+            f[k] = FINISH_DEFAULTS[k]
+    f["art"] = f["art"] if f["art"] in ("mono", "color") else "mono"
+    f["transition"] = f["transition"] if f["transition"] in ("crosszoom", "cut") else "crosszoom"
+    return f
+
+
+def save_finish(f):
+    write_json(FINISH, {k: f[k] for k in FINISH_DEFAULTS if k in f})
+
+
+def finish_filter(f):
+    """ffmpeg filter chain for the look + sliders ('' when nothing changes)."""
+    sat, con, bri, warm, extra = LOOKS[f["look"]]
+    sat, con, bri = sat * f["saturation"], con * f["contrast"], bri + f["brightness"]
+    warm = max(-1.0, min(1.0, warm + f["warmth"]))
+    parts = [extra] if extra else []
+    if abs(sat - 1) > 0.01 or abs(con - 1) > 0.01 or abs(bri) > 0.002:
+        parts.append(f"eq=saturation={sat:.3f}:contrast={con:.3f}:brightness={bri:.3f}")
+    if abs(warm) > 0.01:                 # warm = more red, less blue (cool the other way round)
+        w = 0.14 * warm
+        parts.append(f"colorbalance=rs={w / 2:.3f}:bs={-w / 2:.3f}:rm={w:.3f}:bm={-w:.3f}:rh={w:.3f}:bh={-w:.3f}")
+    return ",".join(parts)
+
+
 def frame_size(s):
     return (1080, 1920) if s["aspect"] == "9:16" else (1920, 1080)
 

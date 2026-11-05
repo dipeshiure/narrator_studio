@@ -543,5 +543,22 @@
  "story.cosy": "CosyVoice 2(이 Mac)",
  "settings.part_cosy": "내레이션 목소리(이 Mac에서 생성)",
  "js.story.cosy_missing": "CosyVoice가 설치되지 않았습니다",
- "js.story.cosy_hint": "이 Mac의 GPU에서 참조 목소리를 따라 자연스러운 목소리를 만듭니다(무료). 모든 장면이 같은 참조를 쓰므로 목소리가 일정합니다."
+ "js.story.cosy_hint": "이 Mac의 GPU에서 참조 목소리를 따라 자연스러운 목소리를 만듭니다(무료). 모든 장면이 같은 참조를 쓰므로 목소리가 일정합니다.",
+ "finish.title": "마무리 필터",
+ "finish.hint": "여기서 정한 느낌은 앞으로 만드는 <strong>모든 동영상</strong>의 마지막에 적용됩니다. 흑백 그림에 색을 입히려면 ‘색감’이나 ‘AI 일러스트 색’을 쓰세요.",
+ "finish.look": "색감",
+ "finish.look_original": "원본",
+ "finish.look_vivid": "선명하게",
+ "finish.look_warm": "따뜻하게",
+ "finish.look_cool": "차갑게",
+ "finish.look_cinema": "시네마(청록·주황)",
+ "finish.look_sepia": "세피아",
+ "finish.warmth": "따뜻함(− 차가움 / + 따뜻함)",
+ "finish.art": "AI 일러스트 색",
+ "finish.art_mono": "흑백(먹)",
+ "finish.art_color": "컬러",
+ "finish.transition": "그림 전환",
+ "finish.tr_cross": "크로스 줌",
+ "finish.tr_cut": "컷",
+ "finish.preview": "미리보기(흑백 그림에는 색감만 반영됩니다)"
 }

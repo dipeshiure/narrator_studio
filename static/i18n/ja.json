@@ -549,5 +549,22 @@
  "story.cosy": "CosyVoice 2(この Mac)",
  "settings.part_cosy": "ナレーションの声(この Mac で生成)",
  "js.story.cosy_missing": "CosyVoice が入っていません",
- "js.story.cosy_hint": "この Mac の GPU で、見本の声をまねた自然な声を作ります(無料)。声は最初から最後まで同じ見本を使うのでそろいます。"
+ "js.story.cosy_hint": "この Mac の GPU で、見本の声をまねた自然な声を作ります(無料)。声は最初から最後まで同じ見本を使うのでそろいます。",
+ "finish.title": "仕上げのフィルター",
+ "finish.hint": "ここで決めた見た目は、これから作る<strong>すべての動画</strong>の最後(仕上げ)にかかります。白黒の絵に色を付けたいときは、「色味」か「AI イラストの色」を使います。",
+ "finish.look": "色味",
+ "finish.look_original": "そのまま",
+ "finish.look_vivid": "あざやか",
+ "finish.look_warm": "暖かい",
+ "finish.look_cool": "冷たい",
+ "finish.look_cinema": "シネマ(青緑とオレンジ)",
+ "finish.look_sepia": "セピア",
+ "finish.warmth": "暖かさ(−冷たい / ＋暖かい)",
+ "finish.art": "AI イラストの色",
+ "finish.art_mono": "白黒(墨)",
+ "finish.art_color": "カラー",
+ "finish.transition": "絵の切り替え",
+ "finish.tr_cross": "クロスズーム",
+ "finish.tr_cut": "カット",
+ "finish.preview": "見本(白黒の絵に色味だけ反映します)"
 }
