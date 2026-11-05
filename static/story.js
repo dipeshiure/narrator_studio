@@ -29,8 +29,8 @@
     seg('story-style', st.style); seg('story-tts-quality', o.tts_quality || 'stable'); seg('story-minutes', st.minutes);
     $('#story-preset-hint').textContent = PRESETS[st.preset].hint;
     $('#story-voice').value = o.voice;
-    const dia = o.tts === 'dia';
-    seg('story-tts', dia ? 'dia' : 'edge');
+    const dia = o.tts === 'dia' || o.tts === 'cosy';          // both clone a reference voice
+    seg('story-tts', o.tts === 'cosy' ? 'cosy' : dia ? 'dia' : 'edge');
     $('#story-voice').hidden = dia; $('#story-dia-voice').hidden = !dia;
     $('#story-dia-voice').value = o.dia_voice ? 'v:' + o.dia_voice : String(o.dia_seed || 33);
     $$('.story-dia').forEach(el => el.hidden = !dia);
@@ -381,7 +381,7 @@
     const btn = $('#story-voice-play'); btn.disabled = true;
     try {
       const res = await fetch('/api/story/voice-sample', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ engine: st.o.tts === 'dia' ? 'dia' : 'edge', seed: st.o.dia_seed || 33, voice_id: st.o.dia_voice || '',
+        body: JSON.stringify({ engine: st.o.tts === 'cosy' ? 'dia' : st.o.tts === 'dia' ? 'dia' : 'edge', seed: st.o.dia_seed || 33, voice_id: st.o.dia_voice || '',
                                voice: st.o.voice, rate: ratePct(st.o.speed), pitch: signed(st.o.pitch, 'Hz') }) });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
       const a = $('#story-voice-audio'); a.src = URL.createObjectURL(await res.blob()); await a.play();
@@ -412,7 +412,7 @@
   // the 仕上がり panel as server options — shared by "動画を作る" and the batch
   function storyOptions() {
     const o = st.o;
-    return { tts_engine: o.tts === 'dia' ? 'dia' : 'edge', dia_seed: o.dia_seed || 33, dia_voice: o.dia_voice || '', tts_quality: o.tts_quality || 'stable', voice: o.voice, tts_rate: ratePct(o.speed), tts_speed: o.speed, tts_pitch: signed(o.pitch, 'Hz'),
+    return { tts_engine: o.tts === 'cosy' ? 'cosy' : o.tts === 'dia' ? 'dia' : 'edge', dia_seed: o.dia_seed || 33, dia_voice: o.dia_voice || '', tts_quality: o.tts_quality || 'stable', voice: o.voice, tts_rate: ratePct(o.speed), tts_speed: o.speed, tts_pitch: signed(o.pitch, 'Hz'),
              visuals: o.visuals, hero: o.hero || '', media_folder: o.media_folder || '', aspect: o.aspect, grain: o.grain,
              show_headings: o.headings, subs: o.engine !== 'off',
              subs_engine: o.engine === 'off' ? 'simple' : o.engine,

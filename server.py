@@ -539,7 +539,7 @@ def story_settings(body):
     for k in ("tts_rate", "tts_pitch"):
         if not SIGNED.match(str(s.get(k, ""))):
             s[k] = story.STORY_DEFAULTS[k]
-    if s.get("tts_engine") not in ("edge", "dia", "say"):
+    if s.get("tts_engine") not in ("edge", "dia", "cosy", "say"):
         s["tts_engine"] = "edge"
     if s.get("tts_quality") not in ("stable", "fast"):
         s["tts_quality"] = "stable"

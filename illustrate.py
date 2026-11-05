@@ -135,31 +135,67 @@ def clean(prompt):
     return re.sub(r"\s{2,}", " ", re.sub(r"\s+([,.])", r"\1", p)).strip(" ,.")
 
 
+PLAN_BATCH = 6          # scenes per LLM call: a 7B model keeps each paragraph's meaning when the list is short
+
+
+def _ask_json(prompt, model):
+    import prep
+    body = json.dumps({"model": model, "stream": False, "keep_alive": 0, "format": "json",
+                       "options": {"temperature": 0.4, "num_ctx": 8192},
+                       "messages": [{"role": "user", "content": prompt}]}).encode()
+    req = urllib.request.Request(prep.OLLAMA, body, {"Content-Type": "application/json"})
+    out = json.loads(json.load(urllib.request.urlopen(req, timeout=300))["message"]["content"])
+    if isinstance(out, dict):
+        out = next((v for v in out.values() if isinstance(v, list)), [])
+    return [clean(x if isinstance(x, str) else next(iter(x.values()), "") if isinstance(x, dict) else str(x)) for x in out]
+
+
 def llm_prompts(scenes, hero, model, log=print):
-    """One short visual description per scene from the local LLM, or None."""
+    """One visual description per scene from the local LLM (None when it fails). Scenes go in small
+    batches, each with the paragraph before and after for context, and the picture must SHOW what
+    the words say; the image model then spends its attention on that subject, not on a stock symbol."""
     import prep
     try:
         prep.ensure_ollama(log)
-        numbered = "\n".join(f"{i + 1}. {sc['text'][:500]}" for i, sc in enumerate(scenes))
-        prompt = (
-            "You direct the illustrations of a black-and-white motivational video. For each numbered "
-            "narration paragraph write ONE visual scene (12-25 English words) for an ink illustration. "
-            f"Use the recurring main character, '{hero}', or a strong symbolic image (storm, lion, "
-            "chains, mountain, empty road, burning candle, church light, chessboard, battlefield). "
-            "Describe only what is visible: pose, place, light, weather. No names of real people, "
-            "no existing anime/manga/film characters, no text in the image. "
-            f"Answer as a JSON list of exactly {len(scenes)} strings.\n\n{numbered}")
-        body = json.dumps({"model": model, "stream": False, "keep_alive": 0, "format": "json",
-                           "messages": [{"role": "user", "content": prompt}]}).encode()
-        req = urllib.request.Request(prep.OLLAMA, body, {"Content-Type": "application/json"})
-        out = json.loads(json.load(urllib.request.urlopen(req, timeout=300))["message"]["content"])
-        if isinstance(out, dict):
-            out = next((v for v in out.values() if isinstance(v, list)), [])
-        out = [clean(x) for x in out]
-        return out if len(out) == len(scenes) and all(out) else None
     except Exception as e:
         log(f"  ! AI で絵の指示文を作れませんでした({e})。キーワードで代用します")
         return None
+    out, missed = [], 0
+    for lo in range(0, len(scenes), PLAN_BATCH):
+        batch = scenes[lo:lo + PLAN_BATCH]
+        before = scenes[lo - 1]["text"][-250:] if lo else ""
+        after = scenes[lo + len(batch)]["text"][:250] if lo + len(batch) < len(scenes) else ""
+        numbered = "\n".join(f"{i + 1}. {sc['text'][:600]}" for i, sc in enumerate(batch))
+        prompt = (
+            "You direct the illustrations of a black-and-white motivational video. For each numbered narration "
+            "paragraph write ONE picture (20-35 English words) that SHOWS what the words are saying at that moment: "
+            "its main idea made concrete as a person doing, feeling or facing something, or the literal object, "
+            "place or situation the words mention (a mirror, a door, a clock before dawn, a man alone in a forest, "
+            "hands in prayer, a cliff edge). Name the subject first, then pose, place, light. The main character is "
+            f"'{hero}'; use him when a person is needed, otherwise show the thing itself. Do not fall back on a "
+            "generic storm, lion or mountain unless the paragraph is about it. Every picture must be different. "
+            "Only what is visible; no names of real people, no existing anime/manga/film characters, no text in the image."
+            + (f"\nThe paragraph before (context only): {before}" if before else "")
+            + (f"\nThe paragraph after (context only): {after}" if after else "")
+            + f"\nAnswer as a JSON list of exactly {len(batch)} strings, one per numbered paragraph.\n\n{numbered}")
+        got = None
+        for _ in range(2):                                   # one retry per batch
+            try:
+                got = _ask_json(prompt, model)
+                if len(got) == len(batch) and all(got):
+                    break
+            except Exception as e:
+                log(f"  ! 絵の指示文の作成に失敗({e})")
+            got = None
+        if got is None:
+            missed += len(batch)
+            got = [""] * len(batch)                          # keyword fallback for these scenes only
+        out += got
+    if missed == len(scenes):
+        return None
+    if missed:
+        log(f"  ! {missed} 場面は AI で絵の指示文を作れなかったので、キーワードで代用します")
+    return out
 
 
 def keyword_prompt(sc, hero):
@@ -174,7 +210,7 @@ def plan(scenes, s, log=print):
     need = [i for i, sc in enumerate(scenes) if not sc.get("image_prompt")]
     got = llm_prompts([scenes[i] for i in need], hero, s["llm_model"], log) if need else None
     for j, i in enumerate(need):
-        scenes[i]["image_prompt"] = got[j] if got else keyword_prompt(scenes[i], hero)
+        scenes[i]["image_prompt"] = got[j] if got and got[j] else keyword_prompt(scenes[i], hero)
     for sc in scenes:
         sc["image_prompt"] = clean(sc["image_prompt"])
 

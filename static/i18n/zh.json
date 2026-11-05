@@ -547,5 +547,6 @@
  "voice.fast": "速度",
  "voice.quality_hint": "“速度”会减少对跑调句子的重做，所以更快完成。更多句子可能变成别的声音。",
  "settings.low_power": "低电量模式已开启，声音生成会慢几倍。请充电并在系统设置 → 电池中关闭。",
- "settings.on_battery": "正在使用电池。生成声音和图片时，接上电源会更快。"
+ "settings.on_battery": "正在使用电池。生成声音和图片时，接上电源会更快。",
+ "story.cosy": "CosyVoice 2（本机）"
 }

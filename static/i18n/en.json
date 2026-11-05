@@ -553,5 +553,6 @@
  "voice.fast": "Fast",
  "voice.quality_hint": "\"Fast\" redoes off-voice lines less, so it finishes sooner. More lines may drift to another voice.",
  "settings.low_power": "Low Power Mode is on, so voice making is several times slower. Plug in and turn it off in System Settings → Battery.",
- "settings.on_battery": "Running on battery. Plug in for faster voice and picture making."
+ "settings.on_battery": "Running on battery. Plug in for faster voice and picture making.",
+ "story.cosy": "CosyVoice 2 (this Mac)"
 }

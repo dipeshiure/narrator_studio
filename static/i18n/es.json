@@ -547,5 +547,6 @@
  "voice.fast": "Rápido",
  "voice.quality_hint": "«Rápido» rehace menos las frases que se desvían, así termina antes. Más frases pueden cambiar de voz.",
  "settings.low_power": "El modo de bajo consumo está activado, así que la voz tarda varias veces más. Conecta el cargador y desactívalo en Ajustes del Sistema → Batería.",
- "settings.on_battery": "Funcionando con batería. Conecta el cargador para generar voz e imágenes más rápido."
+ "settings.on_battery": "Funcionando con batería. Conecta el cargador para generar voz e imágenes más rápido.",
+ "story.cosy": "CosyVoice 2 (este Mac)"
 }

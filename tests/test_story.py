@@ -186,3 +186,24 @@ def test_long_paragraphs_are_split_at_sentence_ends(tmp_path):
     assert all("heading" not in x and "query" not in x for x in parts[1:])
     assert " ".join(x["text"] for x in parts) == long                               # nothing lost
     assert story.split_text("Short one. Another.") == ["Short one. Another."]
+
+
+def test_image_prompts_are_planned_in_small_batches_with_context(monkeypatch):
+    import illustrate, prep
+    calls = []
+    monkeypatch.setattr(prep, "ensure_ollama", lambda log=print: None)
+
+    def fake_ask(prompt, model):
+        n = int(prompt.split("exactly ")[1].split(" ")[0])
+        calls.append(prompt)
+        return [f"picture {len(calls)}-{i}" for i in range(n)]
+    monkeypatch.setattr(illustrate, "_ask_json", fake_ask)
+    scenes = [{"text": f"Paragraph number {i} about a door."} for i in range(14)]
+    got = illustrate.llm_prompts(scenes, "a man", "m")
+    assert len(got) == 14 and len(calls) == 3                      # 6 + 6 + 2
+    assert "The paragraph before" not in calls[0] and "Paragraph number 5" in calls[1]
+    assert "The paragraph after" in calls[0] and "Paragraph number 12" in calls[1].split("after")[1]
+    # a batch that fails twice falls back to keywords for its scenes only
+    monkeypatch.setattr(illustrate, "_ask_json", lambda p, m: (_ for _ in ()).throw(RuntimeError("x")) if "Paragraph number 0" in p else ["a"] * int(p.split("exactly ")[1].split(" ")[0]))
+    got = illustrate.llm_prompts(scenes, "a man", "m")
+    assert got[:6] == [""] * 6 and got[6:] == ["a"] * 8
