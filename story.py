@@ -365,6 +365,7 @@ def art_direction(data, s, work, log=print):
     """For the 'auto' genre: one LLM call turns title + script into the picture look, main character,
     scene guidance and music mood, kept in work/direction.json so a re-render looks the same.
     Fills s['style_color'/'style_mono'/'planner_hint'/'hero'/'art_default'/'bgm_mood']."""
+    Path(work).mkdir(parents=True, exist_ok=True)
     cache = Path(work) / "direction.json"
     d = mv.read_json(cache, None)
     key = mv.hashlib.md5((data["title"] + "".join(sc["text"] for sc in data["scenes"])).encode()).hexdigest()
@@ -985,6 +986,7 @@ def _make_story(script, outdir, s, log=print):
         if illustrate.available():
             if s.get("preset_id") == "auto":
                 art_direction(data, s, work, log)    # the AI reads the script and picks the look
+            s["_work"] = str(work)                   # the picture plan (shots.json) is kept with the video's work files
             illustrate.plan(scenes, s, log)          # LLM first, then free it for FLUX
             mv.memory_gate(log)
             art = illustrate.illustrate([sc for sc in scenes], s, log)
@@ -996,8 +998,10 @@ def _make_story(script, outdir, s, log=print):
     used_photos, credits, photo_credits = set(), [], []
     for i, sc in enumerate(scenes):
         if i in art and not sc.get("chart"):
-            each = sc["dur"] / len(art[i]) + (s["cross"] if crosszoom else 0)    # neighbours overlap by s["cross"] seconds
+            planned = sc.get("shots") if sc.get("shots") and len(sc["shots"]) == len(art[i]) else None
+            even = sc["dur"] / len(art[i])
             for j, png in enumerate(art[i]):
+                each = (planned[j]["end"] - planned[j]["start"] if planned else even) + (s["cross"] if crosszoom else 0)
                 seg = work / f"s{i:03d}_a{j:02d}.mp4"
                 pic = illustrate.trim_bands(png, work / f"s{i:03d}_a{j:02d}.png")   # no side bars
                 render_photo(pic, each, seg, s, n=i + j, trim=0.07)

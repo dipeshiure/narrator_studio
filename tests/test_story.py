@@ -249,21 +249,12 @@ def test_zoom_settings_and_cross_zoom_join(sandbox, tmp_path):
     assert (s["zoom_amount"], s["zoom_focus"], s["cross"]) == ("slow", "right", 1.5)
 
 
-def test_every_genre_preset_loads_with_its_own_look(sandbox):
-    import illustrate, server
-    seen = set()
-    for g in server.STORY_PRESETS:
-        s = story.load_story_settings(g)
-        assert s["planner_hint"] and s["art_default"] in ("mono", "color")
-        assert s["art"] in ("mono", "color")                       # "genre" resolves to the genre's own default
-        look = illustrate.style_for({**s, "art": "color"})
-        assert "no text" in look                                    # every look forbids drawn text
-        seen.add(look)
-        assert server.story_settings({"preset": g, "options": {"hero": ""}})[1]["hero"] == s["hero"]   # empty = keep the genre's
-    assert len(seen) == len(server.STORY_PRESETS)                   # all different
-    assert story.load_story_settings("space")["hero"] == "none"
-    assert story.load_story_settings("bhatt")["art"] == "mono"      # default 'genre': the ink look stays for motivation
-    assert story.load_story_settings("space")["art"] == "color"
+def test_presets_motivation_and_auto_load(sandbox):
+    import server
+    assert set(server.STORY_PRESETS) == {"auto", "bhatt"}
+    a, b = story.load_story_settings("auto"), story.load_story_settings("bhatt")
+    assert b["hero"] == "" and b["art"] == "mono" and a["hero"] == "none" and a["art"] == "color"
+    assert server.story_settings({"preset": "auto", "options": {"hero": ""}})[1]["hero"] == "none"   # empty = keep the preset's
 
 
 def test_planner_reads_small_model_answers(monkeypatch):
@@ -302,3 +293,37 @@ def test_auto_genre_asks_the_ai_for_the_look_and_remembers_it(sandbox, tmp_path,
     s2 = story.load_story_settings("auto")
     story.art_direction({"title": "T2", "scenes": [{"text": "Other."}]}, s2, tmp_path / "x", log=lambda *a: None)
     assert "cinematic illustration" in s2["style_color"]           # AI down: a sensible default, never a crash
+
+
+def test_shot_plan_is_json_timed_to_the_sentences(monkeypatch):
+    import illustrate, prep, json as _json, urllib.request as ur
+    monkeypatch.setattr(prep, "ensure_ollama", lambda log=print: None)
+    monkeypatch.setattr(illustrate.mv, "unload_llm", lambda: None)
+    text = "One was said here. Two was said here. Three was said here. Four was said here."
+    words = [{"w": w, "s": round(i * 0.5, 2), "e": round(i * 0.5 + 0.4, 2)} for i, w in enumerate(text.split())]   # 4 words/sentence = 2 s each
+    sc = {"text": text, "dur": 8.35, "words": words}
+    assert illustrate.sentence_starts(sc) == [0.0, 2.0, 4.0, 6.0]
+    sent = []
+
+    def reply(shots):
+        class R:
+            def read(self): return _json.dumps({"message": {"content": _json.dumps({"shots": shots})}}).encode()
+        def fake(req, timeout=0):
+            sent.append(_json.loads(req.data))
+            return R()
+        monkeypatch.setattr(ur, "urlopen", fake)
+    s = {"llm_model": "m", "hero": "none"}
+    reply([{"prompt": "a lighthouse", "sentence": 1}, {"prompt": "an iceberg", "sentence": 3}, {"prompt": "a ship", "sentence": 4}])
+    plan = illustrate.plan_shots([sc], s, lambda *a: None, {0: 3})
+    assert sent[0]["format"] == illustrate.SHOT_SCHEMA                       # structured output: the answer is schema-valid JSON
+    sh = sc["shots"]
+    assert [x["start"] for x in sh] == [0.0, 4.0, 6.0] and [x["end"] for x in sh] == [4.0, 6.0, 8.35]
+    assert sh[1]["prompt"] == "an iceberg" and plan[0]["scene"] == 1
+    reply([{"prompt": "a", "sentence": 1}, {"prompt": "b", "sentence": 2}, {"prompt": "c", "sentence": 2}])    # too close: dropped
+    sc2 = {"text": text, "dur": 8.35, "words": words}
+    illustrate.plan_shots([sc2], s, lambda *a: None, {0: 3})
+    assert [x["prompt"] for x in sc2["shots"]] == ["a", "b"]
+    monkeypatch.setattr(ur, "urlopen", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("down")))
+    sc3 = {"text": text, "dur": 8.35, "words": words}
+    illustrate.plan_shots([sc3], s, lambda *a: None, {0: 3})
+    assert "shots" not in sc3                                               # LLM down: the old even split still works

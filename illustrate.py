@@ -223,6 +223,105 @@ def keyword_prompt(sc, hero):
     return f"{hero}, {q}, moody atmosphere" if hero else f"{q}, atmospheric"
 
 
+SHOT_SCHEMA = {   # Ollama structured output: the reply is forced into this JSON shape
+    "type": "object",
+    "properties": {"shots": {"type": "array", "items": {"type": "object", "properties": {
+        "prompt": {"type": "string"}, "sentence": {"type": "integer"}}, "required": ["prompt", "sentence"]}}},
+    "required": ["shots"]}
+MIN_SHOT = 2.0          # a picture stays at least this long (s)
+
+
+def _sentences(text):
+    parts = [x.strip() for x in re.findall(r"[^.!?…]+(?:[.!?…]+[\"')\]]*)?\s*", text) if x.strip()]
+    return parts or [text.strip()]
+
+
+def sentence_starts(sc):
+    """Start time (s from the scene start) of every sentence, from the narration's word timings."""
+    sents, words = _sentences(sc["text"]), sc.get("words") or []
+    counts = [len(x.split()) for x in sents]
+    starts, k = [], 0
+    for c in counts:
+        starts.append(round(float(words[k]["s"]), 2) if k < len(words) and isinstance(words[k], dict) and "s" in words[k] else None)
+        k += c
+    if starts and starts[0] is None:
+        starts[0] = 0.0
+    if any(x is None for x in starts):                      # no usable timings: spread by word count
+        total, acc, out = max(1, sum(counts)), 0, []
+        for c in counts:
+            out.append(round(sc["dur"] * acc / total, 2)); acc += c
+        return out
+    starts[0] = 0.0
+    return starts
+
+
+def plan_shots(scenes, s, log=print, counts=None):
+    """For every scene: n pictures, each with an English prompt and the moment it appears (seconds from the
+    scene start), asked from the local LLM with a JSON schema so the answer is always valid JSON. Pictures
+    change on the sentence that talks about them, not on a fixed grid. Sets sc['shots'] =
+    [{prompt, start, end}] and returns the whole plan; scenes the LLM fails on keep one picture per scene
+    prompt (the old behaviour)."""
+    import prep
+    hero = "" if s.get("hero") == "none" else clean(s.get("hero") or HERO)
+    hint = s.get("planner_hint", "")
+    try:
+        prep.ensure_ollama(log)
+    except Exception as e:
+        log(f"  ! AI で絵の指示文を作れませんでした({e})。場面ごとに 1 つの指示文で作ります")
+        return None
+    plan = []
+    for i, sc in enumerate(scenes):
+        n = (counts or {}).get(i, 1)
+        sents = _sentences(sc["text"])
+        starts = sentence_starts(sc)
+        n = max(1, min(n, len(sents)))                       # never more pictures than sentences
+        if n == 1:
+            continue                                          # one picture: the scene prompt does it
+        numbered = "\n".join(f"{k + 1}. {x}" for k, x in enumerate(sents))
+        ask = ("You direct the pictures of a narrated video. The narration of one scene is below, one numbered sentence per line. "
+               f"Choose exactly {n} pictures. For each give an English prompt (15-35 words, subject first, then place and light) that SHOWS what is "
+               "being said at that moment, and the number of the sentence on which the picture should appear. The first picture appears on "
+               "sentence 1; the sentence numbers must increase. "
+               + (f"The recurring main character is '{hero}'; use him when a person is needed. " if hero else "There is no recurring character. ")
+               + (f"Guidance: {hint} " if hint else "")
+               + "Every picture is different; no names of real people, no existing characters; the picture must contain no writing, numbers, "
+               "labels or scale bars.\n\nNarration:\n" + numbered)
+        shots = None
+        for _ in range(2):
+            try:
+                body = json.dumps({"model": s["llm_model"], "stream": False, "keep_alive": "5m", "format": SHOT_SCHEMA,
+                                   "options": {"temperature": 0.4, "num_ctx": 8192},
+                                   "messages": [{"role": "user", "content": ask}]}).encode()
+                req = urllib.request.Request(prep.OLLAMA, body, {"Content-Type": "application/json"})
+                raw = json.loads(json.loads(urllib.request.urlopen(req, timeout=300).read())["message"]["content"])["shots"]
+                cand = [(max(1, min(len(sents), int(x["sentence"]))), clean(x["prompt"])) for x in raw if str(x.get("prompt", "")).strip()]
+                cand.sort(key=lambda x: x[0])
+                if len(cand) >= 2:
+                    shots = cand[:n]
+                    break
+            except Exception as e:
+                log(f"  ! 場面 {i + 1} の絵の計画に失敗({e})")
+        if not shots:
+            continue
+        # timestamps: a picture starts when its sentence is spoken; short ones are dropped
+        keep, last = [], -9.0
+        for k, (sn, pr) in enumerate(shots):
+            t0 = 0.0 if not keep else starts[sn - 1]
+            if keep and (t0 - last < MIN_SHOT or sc["dur"] - t0 < MIN_SHOT):
+                continue
+            keep.append({"prompt": pr, "start": round(t0, 2)}); last = t0
+        for k, sh in enumerate(keep):
+            sh["end"] = round(keep[k + 1]["start"] if k + 1 < len(keep) else sc["dur"], 2)
+        if len(keep) >= 2:
+            sc["shots"] = keep
+            plan.append({"scene": i + 1, "text": sc["text"][:120], "shots": keep})
+    try:
+        mv.unload_llm()                                       # give the memory back before the picture model starts
+    except Exception:
+        pass
+    return plan
+
+
 def plan(scenes, s, log=print):
     """Fill sc['image_prompt'] for every scene (script value > LLM > keywords)."""
     hero = "" if s.get("hero") == "none" else clean(s.get("hero") or HERO)      # "none": no recurring character
@@ -262,12 +361,21 @@ def illustrate(scenes, s, log=print):
     name = KLEIN if family == "flux2" else MODEL     # cache per model: never reuse the other's images
     images, per_scene = [], {}
     t0 = 0.0
+    counts = {}
+    t1 = 0.0
     for i, sc in enumerate(scenes):
-        n = max(1, round(sc["dur"] / shot_seconds(t0 + sc["dur"] / 2, s)))   # faster cuts near the start
-        t0 += sc["dur"] + 0.35
+        counts[i] = max(1, round(sc["dur"] / shot_seconds(t1 + sc["dur"] / 2, s)))   # faster cuts near the start
+        t1 += sc["dur"] + 0.35
+    sc_plan = plan_shots(scenes, s, log, counts) if s.get("shot_plan", True) else None
+    if sc_plan:
+        mv.write_json(Path(s["_work"]) / "shots.json" if s.get("_work") else mv.TMP / "shots.json", sc_plan)
+    for i, sc in enumerate(scenes):
+        planned = sc.get("shots")
+        n = len(planned) if planned else counts[i]
         for k in range(n):
             shot = SHOTS[(i + k) % len(SHOTS)] if n > 1 or i % 2 else SHOTS[0]
-            prompt = f"{sc['image_prompt']}, {shot}, {FRAMING}, {style_for(s)}" if s.get("hero") != "none" else f"{sc['image_prompt']}, {shot}, {style_for(s)}"
+            base = planned[k]["prompt"] if planned else sc["image_prompt"]
+            prompt = f"{base}, {shot}, {FRAMING}, {style_for(s)}" if s.get("hero") != "none" else f"{base}, {shot}, {style_for(s)}"
             seed = int(hashlib.md5(f"{prompt}|{k}".encode()).hexdigest()[:7], 16)
             key = hashlib.md5(f"{name}|{w}x{h}|{prompt}|{seed}".encode()).hexdigest()[:16]
             out = CACHE / f"{key}.png"

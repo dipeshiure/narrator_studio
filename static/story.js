@@ -10,13 +10,8 @@
            bgm: true, mood: 'dark' },
     },
   };
-  // the other genres: same voice and layout, their own caption style and music mood (the picture look,
-  // narration voice and scene ideas come from config/presets/<genre>.json on the server)
-  const GENRE_O = { auto: { mood: 'epic' }, space: { mood: 'epic' }, history: { mood: 'epic' }, nature: { mood: 'uplifting' },
-                    mystery: { mood: 'dark' }, science: { mood: 'uplifting' }, fantasy: { mood: 'epic' } };
-  for (const [g, o] of Object.entries(GENRE_O)) {
-    PRESETS[g] = { hint: t('js.genre.hint_' + g), o: { ...PRESETS.bhatt.o, kc_preset: 'cinema', grain: g !== 'space' && g !== 'nature' && g !== 'science', speed: 1.0, pitch: 0, ...o } };
-  }
+  // automatic mode: same voice and layout; the picture look, main character and music mood are decided from the script
+  PRESETS.auto = { hint: t('js.genre.hint_auto'), o: { ...PRESETS.bhatt.o, kc_preset: 'cinema', grain: false, speed: 1.0, pitch: 0, mood: 'epic' } };
   let opts = null;          // /api/story/options
   let st = null;            // { title, text, preset, o: {...}, job, draft_job, style, minutes }
   let polling = null;
