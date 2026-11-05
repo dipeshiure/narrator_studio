@@ -58,6 +58,9 @@ TOKENS_PER_SEC = 86     # Dia's audio frame rate
 MAX_SECS_PER_WORD = 0.5 # cap the generation length (Dia sometimes runs on with noise)
 PAUSE = 0.25            # silence between chunks of one paragraph (s)
 STT = "mlx-community/whisper-base-asr-fp16"
+REPAIR_ROUNDS = 2        # extra passes that re-voice scenes unlike the rest
+SCENE_DRIFT = 0.2       # octaves from the video's median scene pitch
+SCENE_TIMBRE = 0.2      # same for brightness
 MIN_HEARD = 0.6         # share of the script's words Whisper must recognise in a chunk
 
 
@@ -141,7 +144,9 @@ def main(path):
     tries = max(1, min(5, int(job.get("tries", TRIES))))   # "fast" = fewer redo attempts
     speed = max(0.5, min(2.0, float(job.get("speed", 1.0))))   # 1.0 = Dia's own pace
     ref = Path(job["ref_audio"]) if job.get("ref_audio") else ref_dir / f"dia_seed{seed}.wav"
-    if not todo and ref.exists():
+    checked_path = Path(path).parent / "dia_checked.json"      # scenes already checked by the repair pass
+    checked = set(json.loads(checked_path.read_text())) if checked_path.exists() else set()
+    if not todo and ref.exists() and all(it["out"] in checked for it in items):
         return 0
     unload_llms()                            # the local LLM can hold 4+ GB
     mx.set_cache_limit(512 * 1024 * 1024)   # keep freed GPU buffers small (no swap)
@@ -160,68 +165,106 @@ def main(path):
     print(f"REF {ref_hz:.0f}", flush=True)
     stt = load_stt(STT)
     done = len(items) - len(todo)
+    seen_hz, seen_cent = [], []          # accepted takes so far: the voice the video really has
+
+    def center(vals, fallback):
+        return float(np.median(vals)) if vals else fallback
+
+    def voice_item(it, tmp, seed_off=0):
+        nonlocal bits
+        parts = []
+        for k, text in enumerate(chunks(it["text"])):
+            best = None
+            # target = what this video's accepted takes sound like (Dia's takes sit a little above its own
+            # reference); until 3 takes exist, a wide band around the reference
+            n_seen = len(seen_hz)
+            c_hz, c_cent = center(seen_hz, ref_hz), center(seen_cent, ref_cent)
+            tol_hz = MAX_DRIFT if n_seen >= 3 else 0.4
+            for t in range(tries):
+                wait_for_memory(mx.clear_cache)
+                sd = seed + seed_off + 1000 * t + k
+                try:
+                    wav = say(model, text, sd, tmp, f"c{k}_{t}", ref, ref_text)
+                except Exception as e:
+                    if not bits:
+                        raise
+                    print(f"WARN fast decode failed ({e}); switching to the standard path", flush=True)
+                    dia_fast.uninstall(model); bits = 0
+                    wav = say(model, text, sd, tmp, f"c{k}_{t}", ref, ref_text)
+                hz, cent, spike, dur = voice_feat(wav)
+                drift = abs(math.log2(hz / c_hz)) if hz and c_hz else 9
+                timbre = abs(math.log2(cent / c_cent)) if cent and c_cent else 9
+                clear = recall(text, heard(stt, wav))
+                clean = spike <= MAX_SPIKE and timbre <= MAX_TIMBRE
+                ok = drift <= tol_hz and clear >= MIN_HEARD and clean
+                # intelligible first, then no effect noise / same timbre, then the pitch
+                score = (clear >= MIN_HEARD, clean, -(drift + timbre + max(0, spike - MAX_SPIKE) / 10), clear)
+                if best is None or score > best[3]:
+                    best = (wav, drift, dur, score, clear, spike, timbre, hz, cent)
+                if ok:
+                    break
+            wav, drift, dur, _, clear, spike, timbre, hz, cent = best
+            if drift <= 0.4 and clear >= MIN_HEARD:          # only takes of this voice shape the target
+                seen_hz.append(hz); seen_cent.append(cent)
+            if spike > MAX_SPIKE or timbre > MAX_TIMBRE:
+                print(f"WARN odd take (spike {spike:.0f} dB, timbre {timbre:.2f}) on: {text[:60]}", flush=True)
+            if drift > tol_hz:
+                print(f"WARN pitch drift {drift:.2f} on: {text[:60]}", flush=True)
+            if clear < MIN_HEARD:
+                print(f"WARN unclear speech ({clear:.0%} heard) on: {text[:60]}", flush=True)
+            # too fast -> slow down (never speed up, never below 0.8x)
+            want = len(text.split()) / WPS
+            tempo = max(0.8, min(1.0, dur / want)) if want else 1.0
+            fixed = Path(tmp) / f"fix{k}.wav"
+            subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(wav), "-af",
+                            # same loudness for every chunk, soft limiting of sudden loud bits
+                            f"atempo={tempo:.3f},highpass=f=60,acompressor=threshold=-22dB:ratio=3:attack=5:release=80,"
+                            "loudnorm=I=-18:TP=-2", "-ar", "44100", "-ac", "1", str(fixed)], check=True)
+            parts.append(fixed)
+        out = Path(it["out"]); out.parent.mkdir(parents=True, exist_ok=True)
+        lst = Path(tmp) / "list.txt"
+        gap = Path(tmp) / "gap.wav"
+        if not gap.exists():
+            subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=mono",
+                            "-t", str(PAUSE), str(gap)], check=True)
+        seq = [p for x in parts for p in (x, gap)][:-1]
+        lst.write_text("".join(f"file '{p}'\n" for p in seq))
+        part = out.with_name(out.stem + ".part.wav")
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", str(lst),
+                        "-af", "loudnorm=I=-18" + (f",atempo={speed:.3f}" if abs(speed - 1) > 0.01 else ""),
+                        "-ar", "44100", "-ac", "1", str(part)], check=True)
+        part.replace(out)
+        out.with_suffix(".heard.json").write_text(json.dumps(heard(stt, out, words=True)))
+        for p in parts:
+            p.unlink(missing_ok=True)
+        out.with_suffix(".words.json").unlink(missing_ok=True)      # timings of the old take are stale
+        mx.clear_cache()
+
     with tempfile.TemporaryDirectory() as tmp:
         for it in todo:
-            parts = []
-            for k, text in enumerate(chunks(it["text"])):
-                best = None
-                for t in range(tries):
-                    wait_for_memory(mx.clear_cache)
-                    try:
-                        wav = say(model, text, seed + 1000 * t + k, tmp, f"c{k}_{t}", ref, ref_text)
-                    except Exception as e:
-                        if not bits:
-                            raise
-                        print(f"WARN fast decode failed ({e}); switching to the standard path", flush=True)
-                        dia_fast.uninstall(model); bits = 0
-                        wav = say(model, text, seed + 1000 * t + k, tmp, f"c{k}_{t}", ref, ref_text)
-                    hz, cent, spike, dur = voice_feat(wav)
-                    drift = abs(math.log2(hz / ref_hz)) if hz and ref_hz else 9
-                    timbre = abs(math.log2(cent / ref_cent)) if cent and ref_cent else 9
-                    clear = recall(text, heard(stt, wav))
-                    clean = spike <= MAX_SPIKE and timbre <= MAX_TIMBRE
-                    ok = drift <= MAX_DRIFT and clear >= MIN_HEARD and clean
-                    # intelligible first, then no effect noise / same timbre, then the pitch
-                    score = (clear >= MIN_HEARD, clean, -(drift + timbre + max(0, spike - MAX_SPIKE) / 10), clear)
-                    if best is None or score > best[3]:
-                        best = (wav, drift, dur, score, clear, spike, timbre)
-                    if ok:
-                        break
-                wav, drift, dur, _, clear, spike, timbre = best
-                if spike > MAX_SPIKE or timbre > MAX_TIMBRE:
-                    print(f"WARN odd take (spike {spike:.0f} dB, timbre {timbre:.2f}) on: {text[:60]}", flush=True)
-                if drift > MAX_DRIFT:
-                    print(f"WARN pitch drift {drift:.2f} on: {text[:60]}", flush=True)
-                if clear < MIN_HEARD:
-                    print(f"WARN unclear speech ({clear:.0%} heard) on: {text[:60]}", flush=True)
-                # too fast -> slow down (never speed up, never below 0.8x)
-                want = len(text.split()) / WPS
-                tempo = max(0.8, min(1.0, dur / want)) if want else 1.0
-                fixed = Path(tmp) / f"fix{k}.wav"
-                subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(wav), "-af",
-                                # same loudness for every chunk, soft limiting of sudden loud bits
-                                f"atempo={tempo:.3f},highpass=f=60,acompressor=threshold=-22dB:ratio=3:attack=5:release=80,"
-                                "loudnorm=I=-18:TP=-2", "-ar", "44100", "-ac", "1", str(fixed)], check=True)
-                parts.append(fixed)
-            out = Path(it["out"]); out.parent.mkdir(parents=True, exist_ok=True)
-            lst = Path(tmp) / "list.txt"
-            gap = Path(tmp) / "gap.wav"
-            if not gap.exists():
-                subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=mono",
-                                "-t", str(PAUSE), str(gap)], check=True)
-            seq = [p for x in parts for p in (x, gap)][:-1]
-            lst.write_text("".join(f"file '{p}'\n" for p in seq))
-            part = out.with_name(out.stem + ".part.wav")
-            subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", str(lst),
-                            "-af", "loudnorm=I=-18" + (f",atempo={speed:.3f}" if abs(speed - 1) > 0.01 else ""),
-                            "-ar", "44100", "-ac", "1", str(part)], check=True)
-            part.replace(out)
-            out.with_suffix(".heard.json").write_text(json.dumps(heard(stt, out, words=True)))
-            for p in parts:
-                p.unlink(missing_ok=True)
-            mx.clear_cache()
+            voice_item(it, tmp)
             done += 1
             print(f"TTS {done} {len(items)}", flush=True)
+        # repair pass: a scene whose voice differs from the rest of the video (Dia sometimes slips into
+        # another speaker) is made again with other seeds; the check covers earlier scenes too
+        for rnd in range(1, REPAIR_ROUNDS + 1):
+            feats = {}
+            for it in items:
+                if Path(it["out"]).exists():
+                    f = voice_feat(it["out"]); feats[it["out"]] = f
+            if len(feats) < 4:
+                break
+            mh = float(np.median([f[0] for f in feats.values() if f[0]]))
+            mc = float(np.median([f[1] for f in feats.values()]))
+            bad = [it for it in items if it["out"] in feats and feats[it["out"]][0] and (
+                abs(math.log2(feats[it["out"]][0] / mh)) > SCENE_DRIFT or abs(math.log2(feats[it["out"]][1] / mc)) > SCENE_TIMBRE)]
+            if not bad:
+                break
+            print(f"REPAIR {rnd}: {len(bad)} of {len(feats)} scenes sound unlike the rest, voicing them again", flush=True)
+            for it in bad:
+                Path(it["out"]).unlink(missing_ok=True); Path(it["out"]).with_suffix(".heard.json").unlink(missing_ok=True)
+                voice_item(it, tmp, seed_off=5000 * rnd)
+        checked_path.write_text(json.dumps([it["out"] for it in items]))
     return 0
 
 

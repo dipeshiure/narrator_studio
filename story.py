@@ -523,17 +523,17 @@ def dia_voice(scenes, wavs, s, log=print):
     """Voice every scene without a wav in one Dia run (tools/dia_batch.py), then time the
     words with Whisper and put the script's own spelling back on them."""
     todo = [(sc, w) for sc, w in zip(scenes, wavs) if not w.exists()]
-    if todo:
-        job = todo[0][1].parent / "dia_job.json"
+    if True:                                       # always: dia_batch also checks every scene sounds like the same voice
+        job = wavs[0].parent / "dia_job.json"
         spec = {"seed": int(s.get("dia_seed", 33)), "ref_dir": str(DIA_REFS), "speed": float(s.get("tts_speed", 1.0)),
                 "tries": 2 if s.get("tts_quality") == "fast" else 5,
                 "decode_bits": 4 if s.get("tts_quality") == "fast" else 8,
-                "items": [{"text": sc["text"], "out": str(w)} for sc, w in todo]}
+                "items": [{"text": sc["text"], "out": str(w)} for sc, w in zip(scenes, wavs)]}
         mine = my_voice(s.get("dia_voice"))
         if mine:                                   # the user's recorded voice is the speaker
             spec.update(ref_audio=str(mine[0]), ref_text=mine[1]["text"])
         mv.write_json(job, spec)
-        log(f"  ナレーションを作成中(Dia・この Mac で生成): {len(todo)} 段落")
+        log(f"  ナレーションを作成中(Dia・この Mac で生成): {len(todo)} 段落" if todo else "  ナレーションの声がそろっているか確認しています")
         proc = subprocess.Popen([str(DIA_PY), str(DIA_BATCH), str(job)], cwd=HERE,
                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         tail, shown, warns = [], -1, 0
@@ -549,6 +549,9 @@ def dia_voice(scenes, wavs, s, log=print):
                 log("  ほかの重い処理(声または絵)が終わるのを待っています(同時には動かしません)")
             elif line.startswith("MEMOK"):
                 log("  メモリが空いたので再開しました")
+            elif line.startswith("REPAIR"):
+                n = line.split(":")[1].split(" of ")[0].strip()
+                log(f"  声が他と違う場面 {n} 個を作り直しています(声をそろえるため)")
             elif line.startswith("WARN"):
                 warns += 1
                 if "unclear" in line:
