@@ -39,6 +39,7 @@ from pathlib import Path
 # MPS allocator may not grow past 70 % of unified memory (leaves room for macOS on a 16 GB machine).
 os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
 os.environ.setdefault("PYTORCH_MPS_HIGH_WATERMARK_RATIO", "0.7")
+os.environ.setdefault("PYTORCH_MPS_LOW_WATERMARK_RATIO", "0.5")    # must not exceed the high ratio (default 1.4 is rejected)
 
 log = logging.getLogger("cosyvoice2")
 

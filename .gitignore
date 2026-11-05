@@ -17,3 +17,5 @@ __pycache__/
 logs/
 venv/
 tools/bench/work/
+tools/CosyVoice/
+tools/cosyvoice_venv/
