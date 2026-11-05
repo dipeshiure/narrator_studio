@@ -54,6 +54,7 @@ def sandbox(tmp_path, monkeypatch):
         "REUSE": tmp_path / "reuse_counts.json",
         "OUTPUT": tmp_path / "videos_voice",          # never the real finished-video folder
         "POSTING": tmp_path / "posting",              # never the real motiversity_auto/投稿用動画
+        "FINISH": tmp_path / "finish.json",           # never the user's saved finishing look
     }
     for name, p in paths.items():
         monkeypatch.setattr(mv, name, p)

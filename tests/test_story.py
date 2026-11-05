@@ -107,7 +107,7 @@ def test_illustrate_prompt_guard():
     assert "dark rain" in p
 
 
-def test_bhatt_preset_loads():
+def test_bhatt_preset_loads(sandbox):
     s = story.load_story_settings("bhatt")
     assert s["saturation"] == 0.0 and s["subs_engine"] == "kinetic" and s["visuals"] == "ai"
     assert s["tts_pitch"].endswith("Hz")
@@ -208,3 +208,17 @@ def test_image_prompts_are_planned_in_small_batches_with_context(monkeypatch):
     monkeypatch.setattr(illustrate, "_ask_json", lambda p, m: (_ for _ in ()).throw(RuntimeError("x")) if "Paragraph number 0" in p else ["a"] * int(p.split("exactly ")[1].split(" ")[0]))
     got = illustrate.llm_prompts(scenes, "a man", "m")
     assert got[:6] == [""] * 6 and got[6:] == ["a"] * 8
+
+
+def test_finish_looks_and_art_colour(sandbox):
+    import make_video as mv
+    f = mv.load_finish()
+    assert f["look"] == "original" and mv.finish_filter(f) == ""                     # nothing saved: no filter
+    for look in mv.LOOKS:                                                             # every preset is a valid ffmpeg chain
+        flt = mv.finish_filter({**f, "look": look})
+        if flt:
+            mv.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc=s=64x64:d=0.1", "-vf", flt, "-f", "null", "-"])
+    mv.save_finish({**f, "look": "mono", "art": "color"})
+    assert "hue=s=0" in mv.finish_filter(mv.load_finish())
+    s = story.load_story_settings("bhatt")
+    assert s["art"] == "color" and s["saturation"] == 1.0                             # colour art: the ink preset's grey is undone
