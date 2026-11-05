@@ -70,18 +70,13 @@
     stats();
   }
 
-  // mirrors story.split_text: a paragraph over 70 words becomes ~45-word scenes
-  function sceneCount(p) {
-    const w = (p.match(/\S+/g) || []).length;
-    return w <= 70 ? 1 : Math.max(2, Math.round(w / 45));
-  }
-
   // words that will be spoken (tags and headings are not narrated)
   function stats() {
     const text = $('#story-text').value;
     const body = text.replace(/\[\[[^\]]*\]\]/g, ' ').split('\n').filter(l => !l.trim().startsWith('## ')).join('\n');
     const words = (body.match(/[A-Za-z0-9'$%.,-]+/g) || []).filter(w => /[A-Za-z0-9]/.test(w)).length;
-    const paras = body.split(/\n\s*\n/).filter(p => p.trim()).reduce((n, p) => n + sceneCount(p), 0);   // after the automatic split
+    const sentences = (body.match(/[^.!?…]+(?:[.!?…]+|$)/g) || []).filter(x => x.trim().length > 1).length;
+    const paras = Math.max(words ? 1 : 0, Math.round(sentences / 3.5));        // scenes: about 3-4 sentences each
     const chapters = text.split('\n').filter(l => l.trim().startsWith('## ')).length;
     const min = words / (150 * st.o.speed);
     $('#story-stats').textContent = words ? t('js.story.stats', { words: words.toLocaleString(), paras }) + (chapters ? ' · ' + t('js.story.chapters', { n: chapters }) : '') : '';

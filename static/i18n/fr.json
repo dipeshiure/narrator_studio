@@ -145,7 +145,7 @@
  "story.25": "Ollama (qwen2.5) écrit un script en anglais chapitre par chapitre. 35 minutes prennent quelques minutes. Le brouillon arrive dans la zone ci-dessous : relisez-le et corrigez-le avant de créer la vidéo.",
  "story.26": "Titre",
  "story.27": "Script (anglais)",
- "story.28": "Enregistré automatiquement. Chaque paragraphe devient une scène (voix, image, sous-titres). Les longs paragraphes ou le texte sans retours à la ligne sont coupés automatiquement en fin de phrase en scènes d'environ 45 mots.",
+ "story.28": "Enregistré automatiquement. Une scène (voix, image, sous-titres) fait 3 à 4 phrases : les longs paragraphes sont coupés entre deux phrases, les courts sont réunis. Une phrase n'est jamais coupée au milieu.",
  "story.29": "Médias de chaque paragraphe",
  "story.30": "Voir l'attribution",
  "story.31": "Voyez quels médias chaque paragraphe recevra avant le rendu. S'il y a une erreur, ajoutez ",

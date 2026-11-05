@@ -149,7 +149,7 @@
  "story.25": "Ollama (qwen2.5) writes an English script chapter by chapter. 35 minutes takes a few minutes. The draft lands in the box below: read and edit it before making the video.",
  "story.26": "Title",
  "story.27": "Script (English)",
- "story.28": "Saved automatically. Each paragraph becomes one scene (voice, picture, captions). Long paragraphs, or text without line breaks, are split automatically at sentence ends into scenes of about 45 words.",
+ "story.28": "Saved automatically. One scene (voice, picture, captions) is 3–4 sentences: long paragraphs are cut between sentences, short ones are joined. Sentences are never cut in the middle.",
  "story.29": "Footage for each paragraph",
  "story.30": "Check the matches",
  "story.31": "See which footage each paragraph will get before rendering. If one is wrong, add ",

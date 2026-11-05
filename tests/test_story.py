@@ -173,19 +173,20 @@ def test_ai_pictures_cut_faster_at_the_start():
     assert illustrate.shot_seconds(0, {"image_seconds": 2.0}) == 2.0                    # never slower than the base
 
 
-def test_long_paragraphs_are_split_at_sentence_ends(tmp_path):
-    long = " ".join(f"This is sentence number {i} and it keeps going for a little while longer." for i in range(20))
+def test_scenes_are_three_to_four_whole_sentences(tmp_path):
+    long = " ".join(f"This is sentence number {i} and it keeps going for a little while longer." for i in range(9))
     p = tmp_path / "s.txt"
-    p.write_text(f"Title\n\nShort opener here.\n\n## Chapter\n\n[[query:storm]] {long}\n")
+    p.write_text(f"Title\n\nOne short. Two short.\n\nThree here. Four here.\n\n## Chapter\n\n{long}\n\n"
+                 "[[query:storm]] Tagged one. Tagged two.\n")
     sc = story.load_script(p)["scenes"]
-    assert sc[0]["text"] == "Short opener here."
-    parts = [x for x in sc[1:]]
-    assert 5 <= len(parts) <= 7
-    assert all(len(x["text"].split()) <= 70 and x["text"].endswith(".") for x in parts)
-    assert parts[0]["heading"] == "Chapter" and parts[0]["query"] == "storm"       # tags stay on the first part
-    assert all("heading" not in x and "query" not in x for x in parts[1:])
-    assert " ".join(x["text"] for x in parts) == long                               # nothing lost
-    assert story.split_text("Short one. Another.") == ["Short one. Another."]
+    counts = [len(story.sentences_of(x["text"])) for x in sc]
+    assert counts == [4, 3, 3, 3, 2]                      # short paragraphs joined, long one cut between sentences
+    assert sc[1]["heading"] == "Chapter" and "heading" not in sc[0]
+    assert sc[-1]["query"] == "storm" and sc[-1]["text"] == "Tagged one. Tagged two."   # a tag keeps its own scene
+    body = " ".join(x["text"] for x in sc[1:4])
+    assert body == long                                    # no sentence was cut or lost
+    one = "word " * 120 + "end."                           # a single long sentence is never cut
+    p.write_text(f"T\n\n{one}\n"); assert len(story.load_script(p)["scenes"]) == 1
 
 
 def test_image_prompts_are_planned_in_small_batches_with_context(monkeypatch):

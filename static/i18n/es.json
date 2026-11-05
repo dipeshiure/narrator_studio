@@ -145,7 +145,7 @@
  "story.25": "Ollama (qwen2.5) escribe un guion en inglés capítulo a capítulo. 35 minutos tardan unos minutos. El borrador aparece abajo: léelo y corrígelo antes de crear el vídeo.",
  "story.26": "Título",
  "story.27": "Guion (inglés)",
- "story.28": "Se guarda solo. Cada párrafo es una escena (voz, imagen, subtítulos). Los párrafos largos o el texto sin saltos de línea se dividen solos al final de una frase en escenas de unas 45 palabras.",
+ "story.28": "Se guarda solo. Una escena (voz, imagen, subtítulos) son 3–4 frases: los párrafos largos se cortan entre frases y los cortos se unen. Nunca se corta una frase por la mitad.",
  "story.29": "Material de cada párrafo",
  "story.30": "Ver asignación",
  "story.31": "Mira qué material tendrá cada párrafo antes de renderizar. Si alguno no encaja, añade ",
