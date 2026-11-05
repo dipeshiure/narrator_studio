@@ -1,6 +1,6 @@
 # CosyVoice 2 on Apple Silicon (tools/cosyvoice2_tts.py)
 
-Status: written, syntax-checked, NOT yet run against the real model (needs the repo + a ~2 GB model download).
+Status: installed in tools/cosyvoice_venv (repo: tools/CosyVoice, model: tools/CosyVoice/pretrained_models/CosyVoice2-0.5B); MPS check OK, file and streaming modes tested. Streaming needs the lock in `_serialize_mps` (Metal is not thread-safe).
 
     # 1. environment (Python 3.10 as in the CosyVoice README)
     conda create -n cosyvoice -y python=3.10 && conda activate cosyvoice
@@ -22,3 +22,5 @@ Status: written, syntax-checked, NOT yet run against the real model (needs the r
 
     # 5. check that MPS is used
     python tools/cosyvoice2_tts.py check --repo ~/CosyVoice --model ~/CosyVoice/pretrained_models/CosyVoice2-0.5B
+
+Needed extras beyond the README list: gdown, matplotlib, tensorboard, torchcodec (new torchaudio), and uv instead of conda (no conda here).

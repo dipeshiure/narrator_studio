@@ -32,6 +32,7 @@ import os
 import re
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -133,9 +134,41 @@ class CosyVoiceTTS:
             m.device = device                       # used by tts() for every input tensor
             self.cv.frontend.device = device        # text / speech-token / speaker-embedding tensors
             self.device = device
+            if device.type == "mps":
+                self._serialize_mps()
         except Exception as e:                      # never leave the model half on the GPU
             log.error("moving to %s failed (%s): staying on the CPU", device, e)
             self._to_device(self.torch.device("cpu")) if device.type != "cpu" else None
+
+    def _serialize_mps(self) -> None:
+        """Streaming runs the LLM token loop in a worker thread while the main thread runs flow + vocoder.
+        Metal command buffers are not thread-safe ("failed assertion _status < MTLCommandBufferStatusCommitted"),
+        so every GPU step takes one lock: tokens and audio still interleave, but never overlap."""
+        lock = threading.RLock()
+        m = self.cv.model
+
+        def locked_fn(fn):
+            def run(*a, **k):
+                with lock:
+                    return fn(*a, **k)
+            return run
+
+        def locked_gen(fn):
+            def run(*a, **k):
+                gen = fn(*a, **k)
+                while True:
+                    with lock:
+                        try:
+                            v = next(gen)
+                        except StopIteration:
+                            return
+                    yield v
+            return run
+        m.llm.inference = locked_gen(m.llm.inference)
+        if hasattr(m.llm, "inference_bistream"):
+            m.llm.inference_bistream = locked_gen(m.llm.inference_bistream)
+        m.flow.inference = locked_fn(m.flow.inference)
+        m.hift.inference = locked_fn(m.hift.inference)
 
     def report(self) -> dict:
         """Log (and return) where the weights live and whether MPS really computes: the check asked for."""
