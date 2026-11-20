@@ -2,6 +2,8 @@
 
 台本を入れるだけで、この Mac の中で声（CosyVoice 2）・白黒の劇画風イラスト（FLUX.2 klein）・動く字幕（kinetic-captions）・BGM まで入った語り動画を作るツールです。録音した音声から作ることもできます。
 
+作れるものの見本（短い物語 3 本と、英語の画面）は [docs/showcase](docs/showcase/README.md)。
+
 ## 起動
 
 `start.command` をダブルクリック → ブラウザで http://localhost:8510 が開きます。

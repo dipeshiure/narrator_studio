@@ -19,3 +19,4 @@ venv/
 tools/bench/work/
 tools/CosyVoice/
 tools/cosyvoice_venv/
+docs/showcase/build/
