@@ -26,10 +26,9 @@
   }
   function paint() {
     const o = st.o;
-    seg('story-preset', st.preset); seg('story-visuals', o.visuals); seg('story-aspect', o.aspect);
+    seg('story-visuals', o.visuals); seg('story-aspect', o.aspect);
     seg('story-engine', o.engine); seg('story-kc-preset', o.kc_preset); seg('story-mood', o.mood);
     seg('story-style', st.style); seg('story-minutes', st.minutes);
-    $('#story-preset-hint').textContent = PRESETS[st.preset].hint;
     $('#story-style-field').hidden = st.preset !== 'bhatt';        // calm / fiery tone is for the motivation genre
     $('#story-voice').value = o.voice;
     const cosy = o.tts === 'cosy';
@@ -224,7 +223,6 @@
   const onSeg = (id, fn) => $('#' + id).addEventListener('click', e => {
     const b = e.target.closest('button'); if (b && !b.disabled) fn(b.dataset.v);
   });
-  onSeg('story-preset', v => { st.preset = v; st.o = { ...PRESETS[v].o, hero: st.o.hero }; saveState(); paint(); });
   onSeg('story-visuals', v => set('visuals', v));
   onSeg('story-aspect', v => set('aspect', v));
   onSeg('story-engine', v => set('engine', v));

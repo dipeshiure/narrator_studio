@@ -49,6 +49,13 @@ def test_pick_least_used_respects_enabled_and_mood(sandbox):
     assert music.pick(100, "uplifting")["title"] in ("A", "B")     # C disabled -> fallback to any
 
 
+def test_bgm_stays_level_when_the_voice_stops():
+    flt = mv.bgm_filter("1:a", "2:a", 10, 1.0, {"bgm_volume": 0.10, "fade_out": 1})
+    assert "sidechaincompress" not in flt and "amix" in flt
+    assert "volume=1.350" in flt          # narration boosted before the mix
+    assert "volume=0.100" in flt          # BGM stays quiet under the voice
+
+
 def test_render_with_bgm_ducks_music_and_credits(sandbox, assets):
     music.DIR.mkdir()
     ffmpeg("-f", "lavfi", "-i", "sine=frequency=220:duration=30", "-ac", "2", str(music.DIR / "bed.mp3"))

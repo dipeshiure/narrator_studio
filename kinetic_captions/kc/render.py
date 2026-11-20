@@ -549,7 +549,8 @@ def probe(video_path: str) -> dict:
 def render(video_path: str, layout: dict, out_path: str, matte_dir: str | None = None,
            font_dir: str = "assets/fonts", bg: str | None = None,
            progress: Callable[[float], None] | None = None,
-           canvas: dict | None = None, workers: int = 0, preset: str = "veryfast") -> None:
+           canvas: dict | None = None, workers: int = 0, preset: str = "veryfast",
+           vf: str | None = None) -> None:
     """bg: replace everything outside the person matte with this colour
     (e.g. "#000000"); needs matte_dir.
     progress: optional callback, called every ~10 frames with 0..1.
@@ -592,10 +593,11 @@ def render(video_path: str, layout: dict, out_path: str, matte_dir: str | None =
             for _ in range(info["frames"]):
                 yield None
     else:
-        dec = subprocess.Popen(
-            ["ffmpeg", "-v", "error", "-nostdin", "-i", video_path,
-             "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
-            stdout=subprocess.PIPE, bufsize=n * 4)
+        dec_cmd = ["ffmpeg", "-v", "error", "-nostdin", "-i", video_path]
+        if vf:
+            dec_cmd += ["-vf", vf]
+        dec_cmd += ["-f", "rawvideo", "-pix_fmt", "rgb24", "-"]
+        dec = subprocess.Popen(dec_cmd, stdout=subprocess.PIPE, bufsize=n * 4)
 
         def frames_iter():
             while True:

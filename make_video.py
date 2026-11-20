@@ -18,7 +18,7 @@ Options:
 After each render (settings "auto_publish" / "qa"): publishing kit + thumbnail
 (publish_meta), quality check (qa.py) and the posting folder output/posting.
 """
-import argparse, fcntl, hashlib, json, time, os, random, re, shutil, subprocess, sys, tomllib, urllib.parse, urllib.request
+import argparse, fcntl, hashlib, json, time, os, random, re, shutil, subprocess, sys, urllib.parse, urllib.request
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -35,7 +35,6 @@ SETTINGS = CONF / "settings.json"
 DONE = HERE / "output"          # everything the tool produced
 OUTPUT = DONE / "videos"        # single finished-video folder (完成動画 + 投稿 pages, auto workers)
 POSTING = DONE / "posting"       # ready-to-post folders (make_posting.py), inside the tool folder
-CONFIG = Path("/Users/niuredipesh/Desktop/MoneyPrinterTurbo/config.toml")
 
 # Motiversity-style shot pool: training, struggle, nature, city, success.
 QUERIES = [
@@ -69,11 +68,12 @@ DEFAULTS = {
     # footage
     "offline": False,            # True = never download, only use clips on disk
     "queries": QUERIES,          # Pexels search terms when online
+    "visuals": "stock",          # stock = the usual pool; asset = T5 + CLIP; ai = pictures only
     # audio
-    "remove_music": True,        # Demucs: drop the background music, keep only the voice
-    "trim_ads": True,
-    "tighten_pauses": True,      # remove long silent stretches (pauses > max_pause seconds)
-    "max_pause": 1.2,            # cut ads / sponsor reads / subscribe requests (local AI)
+    "remove_music": False,       # uploaded audio is used as it is
+    "trim_ads": False,           # odd lines are cut by hand, not by the app
+    "tighten_pauses": False,
+    "max_pause": 1.2,            # longest silence kept when tighten_pauses is on (seconds)
     "llm_model": "qwen2.5:7b-instruct",
     # subtitles
     "subs": True,
@@ -94,7 +94,7 @@ DEFAULTS = {
     "whisper_model": "base",
     # after each render
     "bgm": True,                 # free background music (incompetech, CC BY) under the voice
-    "bgm_volume": 0.22,          # music level before ducking (0-1)
+    "bgm_volume": 0.10,          # steady music level under the voice (0-1); keep below narration
     "bgm_mood": "auto",          # auto / epic / uplifting / dark
     "auto_publish": True,        # publishing kit (titles/description/tags) + thumbnail + posting folder
     "qa": True,                  # quality check (qa.py): length, decode, resolution, subtitles, ads
@@ -229,7 +229,7 @@ def duration(path):
 
 
 def pexels_key():
-    """Pexels API key: $PEXELS_API_KEY, motiversity_auto/.env, or MoneyPrinterTurbo's config."""
+    """Pexels API key: $PEXELS_API_KEY, or this project's .env."""
     if os.environ.get("PEXELS_API_KEY"):
         return os.environ["PEXELS_API_KEY"].strip()
     env = HERE / ".env"
@@ -237,11 +237,7 @@ def pexels_key():
         for line in env.read_text().splitlines():
             if line.strip().startswith("PEXELS_API_KEY=") and line.split("=", 1)[1].strip():
                 return line.split("=", 1)[1].strip().strip('"\'')
-    if CONFIG.exists():
-        keys = tomllib.load(open(CONFIG, "rb"))["app"].get("pexels_api_keys") or []
-        if keys:
-            return keys[0]
-    raise RuntimeError("Pexels の API キーがありません(motiversity_auto/.env に PEXELS_API_KEY=... を書いてください)")
+    raise RuntimeError("Pexels の API キーがありません(.env に PEXELS_API_KEY=... を書いてください)")
 
 
 def has_pexels_key():
@@ -437,6 +433,23 @@ def whisper_words(audio, model, offset=0.0):
             for seg in res["segments"] for w in seg.get("words", []) if w["word"].strip()]
 
 
+def whisper_words_many(audios, model):
+    """Word timings for many clips with one model load. The model process exits when the list is done."""
+    paths = [Path(a) for a in audios]
+    if not paths:
+        return []
+    if os.environ.get("MV_STT") != "cpu" and model in GPU_STT_MODELS and GPU_STT_PY.exists() and GPU_STT.exists():
+        try:
+            r = subprocess.run([str(GPU_STT_PY), str(GPU_STT), GPU_STT_MODELS[model], *map(str, paths)],
+                               capture_output=True, text=True, timeout=3600)
+            lines = [ln for ln in r.stdout.splitlines() if ln.startswith("[")]
+            if r.returncode == 0 and len(lines) == len(paths):
+                return [json.loads(ln) for ln in lines]
+        except Exception:
+            pass
+    return [whisper_words(p, model) for p in paths]
+
+
 def fill_gaps(audio, words, total, model, scratch, min_gap=2.5, min_db=-38.0):
     """Whisper sometimes skips a whole stretch (often the last part, or a different
     voice such as an ad read). Re-transcribe any long untranscribed stretch that
@@ -568,24 +581,28 @@ def kinetic_available():
     return KC_PY.exists() and (KC_DIR / "mv_bridge.py").exists()
 
 
-def burn_kinetic(video, words, out, s, work, log=print):
+def burn_kinetic(video, words, out, s, work, log=print, vf=None):
     """Kinetic captions (kinetic_captions/, own venv) drawn onto a finished video.
-    Uses our word timings as they are (no second transcription)."""
+    Uses our word timings as they are (no second transcription).
+    vf, when set, is applied while the frames are read, so the caller can skip a separate encode."""
     if not kinetic_available():
         raise RuntimeError("kinetic-captions の環境がありません。motiversity_auto で次を実行してください: " + KC_SETUP)
     work, video, out = Path(work).resolve(), Path(video).resolve(), Path(out).resolve()
     work.mkdir(parents=True, exist_ok=True)
     job = work / "kc_job.json"          # the bridge runs in kinetic_captions/: absolute paths only
-    write_json(job, {"video": str(video), "out": str(out), "work": str(work / "kc"),
-                     "words": [w for w in words if str(w.get("w", "")).strip()],
-                     "opts": {"preset": s.get("kc_preset", "motiversity"),
-                              "font": s.get("kc_font", ""),
-                              "accent_font": s.get("kc_accent_font", ""),
-                              "size": float(s.get("kc_size", 1.0)),
-                              "text_color": "#" + str(s.get("color", "FFFFFF")).lstrip("#"),
-                              "accent_color": ("#" + str(s["highlight_color"]).lstrip("#"))
-                              if s.get("highlight") and s.get("kc_preset") == "hormozi" else None,
-                              "position": s.get("kc_position", "auto")}})
+    job_body = {"video": str(video), "out": str(out), "work": str(work / "kc"),
+                "words": [w for w in words if str(w.get("w", "")).strip()],
+                "opts": {"preset": s.get("kc_preset", "motiversity"),
+                         "font": s.get("kc_font", ""),
+                         "accent_font": s.get("kc_accent_font", ""),
+                         "size": float(s.get("kc_size", 1.0)),
+                         "text_color": "#" + str(s.get("color", "FFFFFF")).lstrip("#"),
+                         "accent_color": ("#" + str(s["highlight_color"]).lstrip("#"))
+                         if s.get("highlight") and s.get("kc_preset") == "hormozi" else None,
+                         "position": s.get("kc_position", "auto")}}
+    if vf:
+        job_body["vf"] = vf
+    write_json(job, job_body)
     proc = subprocess.Popen([str(KC_PY), str(KC_DIR / "mv_bridge.py"), str(job)], cwd=KC_DIR,
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     tail, shown = [], -1
@@ -672,29 +689,79 @@ def work_dir(mp3):
     return TMP / hashlib.md5(Path(mp3).stem.encode()).hexdigest()[:12]
 
 
+def scenes_from_words(words, total):
+    """One scene per spoken sentence. A scene runs from its sentence start to the next one
+    (the first from 0, the last to `total`), so the scenes add up to the whole audio
+    and pictures never drift away from the voice across pauses."""
+    import prep
+    rows = [r for r in prep.sentences_from_words(words or []) if (r.get("text") or "").strip()]
+    total = float(total or 0)
+    if not rows:
+        return [{"text": "a quiet scene", "dur": max(0.5, total or 1.0)}]
+    starts = [0.0] + [float(r["s"]) for r in rows[1:]] + [max(total, float(rows[-1]["e"]))]
+    return [{"text": r["text"].strip(), "dur": max(0.05, round(starts[i + 1] - starts[i], 3))}
+            for i, r in enumerate(rows)]
+
+
+def _asset_segments(words, total, s, work, log, grade):
+    """T5 search phrase, CLIP on the top hits, then the winning image or video for each sentence."""
+    import story
+    from asset_engine import choose
+    scenes = scenes_from_words(words, total)
+    if s.get("visuals") == "ai":
+        picks = {i: {"kind": "ai", "prompt": sc["text"], "dur": sc["dur"]} for i, sc in enumerate(scenes)}
+    else:
+        picks = choose(scenes, s, work, log)
+    picks = story.fill_asset_images(picks, scenes, s, work, log)
+    segs, carry = [], 0.0          # carry: length of scenes without a picture, given to the next shot
+    for i, sc in enumerate(scenes):
+        sh = picks.get(i) or {}
+        shot = {**sc, "dur": sc["dur"] + carry}
+        try:
+            if not sh.get("path"):
+                raise ValueError("no picture")
+            segs.append(story.render_asset_shot(i, shot, sh, work, s, grade))
+            carry = 0.0
+        except Exception as e:
+            carry += sc["dur"]
+            log(f"  ! 場面 {i + 1} を入れられませんでした({e})")
+    if segs and carry > 0.05:      # trailing scenes failed: hold the last good picture
+        last = max(i for i in range(len(scenes)) if (picks.get(i) or {}).get("path"))
+        try:
+            segs.append(story.render_asset_shot(len(scenes), {**scenes[last], "dur": carry}, picks[last], work, s, grade))
+        except Exception as e:
+            log(f"  ! 最後の {carry:.1f} 秒が埋まりませんでした({e})")
+    return segs
+
+
 def _make(mp3, out, s, log):
     import prep
     log(f"== {mp3.name}")
     work = work_dir(mp3)
     work.mkdir(parents=True, exist_ok=True)
-    # voice only (Demucs) -> transcript -> ads/intros cut out (prep.py)
-    if s["subs"] or s["trim_ads"]:
-        audio, words = prep.prepare(mp3, work, s, log)
-    else:
-        audio, words = prep.source_audio(mp3, work, s, log), []
+    # The uploaded file is the soundtrack. Music removal, ad cuts and pause cuts stay off.
+    s = {**s, "remove_music": False, "trim_ads": False, "tighten_pauses": False}
+    if s.get("visuals") != "ai":
+        s["visuals"] = "asset"
+    audio, words = prep.prepare(mp3, work, s, log)
     total = duration(audio)
-    # plan shot lengths first, then take that many distinct clips
-    cut, lengths, t = float(s["cut"]), [], 0.0
-    while total - t >= 0.5:
-        d = min(round(random.uniform(cut * 0.7, cut * 1.3), 2), total - t)
-        lengths.append(d); t += d
-    clips = take_clips(len(lengths), mp3.stem, s, log)
-    if not clips:
-        raise RuntimeError("素材がありません(オフライン設定で素材が0本の可能性)")
-    log(f"  素材 {len(clips)} 本を確保(未使用 残り {len(library_pool())} 本)")
-
     grade = grade_filter(s)
-    segs = []
+    segs = _asset_segments(words, total, s, work, log, grade) if s.get("visuals") in ("asset", "ai") else []
+    if segs:
+        log(f"  素材 {len(segs)} 本を文の長さに合わせて入れました")
+        lengths = []
+    else:
+        if s.get("visuals") in ("asset", "ai"):
+            log("  自動の素材が無いので、いつもの素材に戻します")
+        # plan shot lengths first, then take that many distinct clips
+        cut, lengths, t = float(s["cut"]), [], 0.0
+        while total - t >= 0.5:
+            d = min(round(random.uniform(cut * 0.7, cut * 1.3), 2), total - t)
+            lengths.append(d); t += d
+        clips = take_clips(len(lengths), mp3.stem, s, log)
+        if not clips:
+            raise RuntimeError("素材がありません(オフライン設定で素材が0本の可能性)")
+        log(f"  素材 {len(clips)} 本を確保(未使用 残り {len(library_pool())} 本)")
     for n, d in enumerate(lengths):
         src = clips[n % len(clips)]
         for attempt in range(3):           # unreadable clip: take one replacement
@@ -730,7 +797,7 @@ def _make(mp3, out, s, log):
     music = pick_music(total, s, log) if s.get("bgm") else None
     cmd = ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(lst), "-i", str(audio)]
     if music:
-        # free BGM under the voice: ducked (sidechain) while someone speaks, faded in/out,
+        # free BGM under the voice at one steady level, faded in/out,
         # then the whole mix normalised to YouTube loudness
         fc = bgm_filter("1:a", "2:a", total, fo, s)
         cmd += ["-stream_loop", "-1", "-i", music["path"], "-filter_complex", fc, "-vf", vf,
@@ -787,14 +854,17 @@ def refresh_posting(videos_dir, log=print):
 
 
 def bgm_filter(voice, bgm, total, fade_out, s):
-    """filter_complex: BGM ducked under the voice (sidechain), faded, mix normalised to -14 LUFS -> [a]."""
-    vol = float(s.get("bgm_volume", 0.22))
+    """filter_complex: voice plus a steady BGM bed, faded at the ends, mix normalised to -14 LUFS -> [a].
+
+    The bed stays at one level when the voice stops. It does not rise in the pauses.
+    Voice is lifted a little before the mix so narration wins over the bed."""
+    vol = float(s.get("bgm_volume", 0.10))
+    vgain = float(s.get("voice_volume", 1.35))
     fo = fade_out
-    return (f"[{voice}]aresample=48000,asplit=2[v][key];"
+    return (f"[{voice}]aresample=48000,volume={vgain:.3f}[v];"
             f"[{bgm}]aresample=48000,atrim=0:{total:.2f},volume={vol:.3f},"
             f"afade=t=in:d=2,afade=t=out:st={max(0.0, total - fo - 1):.2f}:d={fo + 1:.2f}[m];"
-            f"[m][key]sidechaincompress=threshold=0.015:ratio=5:attack=20:release=500[md];"
-            f"[v][md]amix=inputs=2:duration=first:normalize=0,"
+            f"[v][m]amix=inputs=2:duration=first:normalize=0,"
             f"loudnorm=I=-14:TP=-1.5:LRA=11,afade=t=out:st={max(0.0, total - fo):.2f}:d={fo:.2f}[a]")
 
 

@@ -53,14 +53,13 @@
       <button class="icon-btn" id="sidebar-toggle" aria-controls="sidebar" aria-expanded="true"
               aria-label="メニューを折りたたむ" title="メニューを折りたたむ" data-i18n-attr="aria-label:app.1;title:app.1">
         <svg width="20" height="20" aria-hidden="true"><use href="#i-panel-close"/></svg></button>
-      <button class="brand-home" id="brand-home" aria-label="ホーム(作成)へ" title="ホーム" data-i18n-attr="aria-label:app.2;title:app.3">
+      <button class="brand-home" id="brand-home" aria-label="ホーム(アップロード)へ" title="ホーム" data-i18n-attr="aria-label:app.2;title:app.3">
         <span class="brand-mark"><svg width="18" height="18" aria-hidden="true"><use href="#i-clapper"/></svg></span>
-        <span class="brand-text"><span class="brand-name">Narrator Studio</span><span class="brand-sub" data-i18n="app.6">台本から語り動画を自動生成</span></span>
+        <span class="brand-text"><span class="brand-name">Narrator Studio</span><span class="brand-sub" data-i18n="app.6">音声から動画を作る</span></span>
       </button>
     </div>
     <nav class="nav" aria-label="メイン" data-i18n-attr="aria-label:app.4">
       <button data-page="story" aria-current="page"><svg width="20" height="20" aria-hidden="true"><use href="#i-script"/></svg><span class="lbl" data-i18n="app.7">作成</span><span id="nav-story-badge" class="badge badge-live" hidden></span></button>
-      <button data-page="upload"><svg width="20" height="20" aria-hidden="true"><use href="#i-upload"/></svg><span class="lbl" data-i18n="app.8">アップロード</span><span id="nav-inbox-badge" class="badge badge-idle" hidden></span></button>
       <button data-page="library"><svg width="20" height="20" aria-hidden="true"><use href="#i-film"/></svg><span class="lbl" data-i18n="app.9">素材</span></button>
       <button data-page="videos"><svg width="20" height="20" aria-hidden="true"><use href="#i-play"/></svg><span class="lbl" data-i18n="app.10">完成動画</span></button>
       <button data-page="posts"><svg width="20" height="20" aria-hidden="true"><use href="#i-send"/></svg><span class="lbl" data-i18n="app.11">投稿</span><span id="nav-posts-badge" class="badge badge-idle" hidden></span></button>
@@ -72,149 +71,6 @@
   </aside>
 
   <main>
-    <!-- ================= UPLOAD ================= -->
-    <section class="page" id="page-upload" aria-labelledby="h-upload">
-      <div class="page-head">
-        <div><h1 id="h-upload" data-i18n="upload.18">アップロード</h1>
-          <p class="lede" data-i18n="upload.19">音声をまとめて入れると、自動で「音楽の除去 → 文字起こし → 宣伝・告知のチェック」をします。カットする部分を確認してから動画にできます。動画の見た目(字幕・色・BGM)はこのページの下で設定できます。</p></div>
-      </div>
-
-      <div class="card">
-        <label class="dropzone dropzone-lg" id="inbox-drop">
-          <svg width="28" height="28" aria-hidden="true"><use href="#i-upload"/></svg>
-          <strong data-i18n="upload.20">音声をドラッグ&ドロップ(複数・フォルダごとOK)</strong>
-          <span class="hint">mp3 / m4a / wav / aac / flac / ogg / aiff</span>
-          <input id="inbox-files" type="file" multiple accept=".mp3,.m4a,.wav,.aac,.flac,.ogg,.aiff,.aif,audio/*" class="sr-only">
-        </label>
-        <div class="row" style="margin-top:12px;flex-wrap:wrap">
-          <button class="btn" id="pick-files"><svg width="18" height="18" aria-hidden="true"><use href="#i-upload"/></svg><span data-i18n="upload.21">ファイルを選ぶ</span></button>
-          <button class="btn" id="pick-folder"><svg width="18" height="18" aria-hidden="true"><use href="#i-folder"/></svg><span data-i18n="upload.22">フォルダを選ぶ</span></button>
-          <input id="inbox-folder" type="file" webkitdirectory multiple class="sr-only">
-        </div>
-        <div id="upload-progress" hidden style="margin-top:16px">
-          <div class="row-between" style="font-size:13px;margin-bottom:6px"><span id="upload-label" data-i18n="upload.23">アップロード中…</span><span id="upload-pct">0%</span></div>
-          <div class="progress"><div></div></div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-head" style="flex-wrap:wrap">
-          <label class="check"><input type="checkbox" id="inbox-all"><span data-i18n="upload.24">すべて選択</span></label>
-          <span class="video-meta" id="inbox-summary"></span>
-          <div class="row" style="flex-wrap:wrap;margin-left:auto">
-            <button class="btn btn-sm btn-primary" id="inbox-gen-ready" data-i18n="upload.25">確認待ちを全部生成</button>
-            <button class="btn btn-sm" id="inbox-gen-sel" disabled data-i18n="upload.26">選択を生成</button>
-            <button class="btn btn-sm btn-danger" id="inbox-del-sel" disabled data-i18n="upload.27">選択を削除</button>
-          </div>
-        </div>
-        <ul class="inbox-list" id="inbox-list"></ul>
-      </div>
-          <div class="card" id="settings">
-          <div class="card-head"><h2 data-i18n="upload.28">音声から作るときの見た目</h2>
-            <div class="row"><span class="save-state" id="save-state"><span class="dot"></span><span data-i18n="upload.29">保存済み</span></span>
-              <button class="btn btn-sm" id="reset-settings" data-i18n="upload.30">初期化</button></div>
-          </div>
-
-          <div class="preview" id="preview" aria-label="字幕プレビュー" data-i18n-attr="aria-label:upload.1">
-            <span class="preview-tag" data-i18n="upload.1">字幕プレビュー</span>
-            <div class="preview-caption" id="preview-caption"></div>
-          </div>
-
-          <details class="group" open><summary><span data-i18n="upload.31">映像</span><svg width="18" height="18"><use href="#i-down"/></svg></summary>
-            <div class="group-body">
-              <div class="field"><span class="label" id="l-aspect" data-i18n="upload.32">画面サイズ</span>
-                <div class="segmented" role="group" aria-labelledby="l-aspect" data-seg="aspect">
-                  <button data-v="16:9">16:9 YouTube</button><button data-v="9:16">9:16 Shorts</button></div></div>
-              <div class="field" data-range="cut" data-min="1.5" data-max="8" data-step="0.5" data-label="upload.2" data-unit="upload.3"></div>
-              <div class="field" data-range="fade_in" data-min="0" data-max="4" data-step="0.5" data-label="upload.4" data-unit="upload.3"></div>
-              <div class="field" data-range="fade_out" data-min="0" data-max="4" data-step="0.5" data-label="upload.5" data-unit="upload.3"></div>
-              <div class="field"><span class="label" id="l-bitrate" data-i18n="upload.33">画質</span>
-                <div class="segmented" role="group" aria-labelledby="l-bitrate" data-seg="bitrate">
-                  <button data-v="4M" data-i18n="upload.34">軽量</button><button data-v="6M" data-i18n="upload.35">標準</button><button data-v="10M" data-i18n="upload.36">高画質</button></div></div>
-            </div></details>
-
-          <details class="group"><summary><span data-i18n="upload.37">色調</span><svg width="18" height="18"><use href="#i-down"/></svg></summary>
-            <div class="group-body">
-              <div class="field" data-range="contrast" data-min="0.8" data-max="1.5" data-step="0.02" data-label="upload.6"></div>
-              <div class="field" data-range="brightness" data-min="-0.2" data-max="0.2" data-step="0.01" data-label="upload.7"></div>
-              <div class="field" data-range="saturation" data-min="0" data-max="1.5" data-step="0.05" data-label="upload.8"></div>
-              <label class="check"><input type="checkbox" data-key="vignette"><span data-i18n="upload.38">ビネット(周辺を暗く)</span></label>
-            </div></details>
-
-          <details class="group" open><summary><span data-i18n="upload.39">音声</span><svg width="18" height="18"><use href="#i-down"/></svg></summary>
-            <div class="group-body">
-              <label class="check"><input type="checkbox" data-key="remove_music"><span data-i18n="upload.40">音楽を除去して、話している声だけ残す</span></label>
-              <p class="hint" style="font-size:12px;color:var(--color-muted-foreground);margin:4px 0 0" data-i18n="upload.41">Demucs(AI 音源分離)で BGM を取り除き、声の音量をそろえてから動画にします。字幕の文字起こしも声だけで行うので精度が上がります。</p>
-              <label class="check" style="margin-top:8px"><input type="checkbox" data-key="trim_ads"><span data-i18n="upload.42">宣伝・告知を自動でカット(AI)</span></label>
-              <p class="hint" style="font-size:12px;color:var(--color-muted-foreground);margin:4px 0 0" data-i18n="upload.43">アプリ紹介・スポンサー・チャンネル登録のお願い・最初と最後の挨拶などを、手元の AI(Ollama)とキーワードで見つけてカットします。アップロードページで確認・修正できます。</p>
-              <label class="check" style="margin-top:8px"><input type="checkbox" data-key="bgm"><span data-i18n="upload.44">BGM(無料音楽)を入れる</span></label>
-              <p class="hint" style="font-size:12px;color:var(--color-muted-foreground);margin:4px 0 8px" data-i18n="upload.45">Kevin MacLeod(incompetech.com)の無料曲を、声が出ている間は自動で小さくして重ねます。CC BY 4.0 なので、使った曲のクレジットを説明文に自動で入れます。</p>
-              <div class="field" data-range="bgm_volume" data-min="0.05" data-max="0.6" data-step="0.01" data-label="upload.9"></div>
-              <div class="field"><span class="label" id="l-bgm-mood" data-i18n="upload.46">曲の雰囲気</span>
-                <div class="segmented" role="group" aria-labelledby="l-bgm-mood" data-seg="bgm_mood">
-                  <button data-v="auto" data-i18n="upload.47">おまかせ</button><button data-v="epic" data-i18n="upload.48">壮大</button><button data-v="uplifting" data-i18n="upload.49">前向き</button><button data-v="dark" data-i18n="upload.50">重厚</button></div></div>
-            </div></details>
-
-          <details class="group" open><summary><span data-i18n="upload.51">字幕</span><svg width="18" height="18"><use href="#i-down"/></svg></summary>
-            <div class="group-body">
-              <label class="check"><input type="checkbox" data-key="subs"><span data-i18n="upload.52">字幕を入れる(Whisper で文字起こし)</span></label>
-              <div class="field"><span class="label" id="l-engine" data-i18n="upload.53">エンジン</span>
-                <div class="segmented" role="group" aria-labelledby="l-engine" data-seg="subs_engine">
-                  <button data-v="kinetic">kinetic-captions</button><button data-v="simple" data-i18n="upload.54">シンプル</button></div></div>
-              <div class="kc-only">
-                <p class="hint" style="font-size:12px;color:var(--color-muted-foreground);margin:0 0 12px" data-i18n="upload.55">単語ごとに大きさ・色・動きが変わる字幕です。強い言葉は大きく、数字は色付きで出ます。</p>
-                <div class="field"><span class="label" id="l-kcp" data-i18n="upload.56">演出</span>
-                  <div class="segmented seg-grid" role="group" aria-labelledby="l-kcp" data-seg="kc_preset">
-                    <button data-v="bhatt" data-i18n="upload.57">静かな語り</button><button data-v="motiversity" data-i18n="upload.58">モチバーシティ</button><button data-v="hormozi" data-i18n="upload.59">ホルモジ</button><button data-v="clean" data-i18n="upload.60">控えめ</button><button data-v="cinema" data-i18n="kc.cinema">シネマ</button><button data-v="impact" data-i18n="kc.impact">インパクト</button></div></div>
-                <div class="field"><label for="kc-font" data-i18n="upload.61">フォント</label>
-                  <select id="kc-font" data-key="kc_font"><option value="" data-i18n="upload.62">おまかせ(演出に合わせる)</option></select></div>
-                <div class="field" data-range="kc_size" data-min="0.6" data-max="1.6" data-step="0.05" data-label="upload.10"></div>
-                <div class="field"><span class="label" id="l-kcpos" data-i18n="upload.63">位置</span>
-                  <div class="segmented" role="group" aria-labelledby="l-kcpos" data-seg="kc_position">
-                    <button data-v="auto" data-i18n="upload.47">おまかせ</button><button data-v="top" data-i18n="upload.64">上</button><button data-v="center" data-i18n="upload.65">中央</button><button data-v="lower" data-i18n="upload.66">下</button></div></div>
-              </div>
-              <div class="ass-only">
-              <div class="field"><label for="font" data-i18n="upload.61">フォント</label>
-                <select id="font" data-key="font">
-                  <option>Impact</option><option>Arial Black</option><option>Helvetica Neue</option>
-                  <option>Futura</option><option>Avenir Next Condensed</option><option>Arial</option></select></div>
-              <div class="field" data-range="font_size" data-min="30" data-max="140" data-step="1" data-label="upload.13"></div>
-              <label class="check"><input type="checkbox" data-key="uppercase"><span data-i18n="upload.71">大文字にする</span></label>
-              <div class="field"><span class="label" data-i18n="upload.72">色</span>
-                <div class="color-row">
-                  <label class="swatch"><span data-i18n="upload.73">文字</span><input type="color" data-key="color"></label>
-                  <label class="swatch"><span data-i18n="upload.74">縁取り</span><input type="color" data-key="outline_color"></label>
-</div></div>
-              <div class="field" data-range="outline" data-min="0" data-max="10" data-step="1" data-label="upload.14"></div>
-              <div class="field" data-range="shadow" data-min="0" data-max="8" data-step="1" data-label="upload.15"></div>
-              <div class="field"><span class="label" id="l-pos" data-i18n="upload.63">位置</span>
-                <div class="segmented" role="group" aria-labelledby="l-pos" data-seg="alignment">
-                  <button data-v="8" data-i18n="upload.64">上</button><button data-v="5" data-i18n="upload.65">中央</button><button data-v="2" data-i18n="upload.66">下</button></div></div>
-              <div class="field" data-range="margin_v" data-min="0" data-max="400" data-step="10" data-label="upload.17" data-unit="px"></div>
-              </div>
-              <div class="field"><span class="label" id="l-model" data-i18n="upload.78">文字起こし精度</span>
-                <div class="segmented" role="group" aria-labelledby="l-model" data-seg="whisper_model">
-                  <button data-v="tiny" data-i18n="upload.79">速い</button><button data-v="base" data-i18n="upload.35">標準</button><button data-v="small" data-i18n="upload.80">高精度</button></div>
-                <span class="hint" data-i18n="upload.81">高精度は初回に約460MBをダウンロードします</span></div>
-            </div></details>
-
-          <details class="group"><summary><span data-i18n="upload.82">素材</span><svg width="18" height="18"><use href="#i-down"/></svg></summary>
-            <div class="group-body">
-              <label class="check"><input type="checkbox" data-key="offline"><span data-i18n="upload.83">ダウンロードしない(手元の素材だけで作る)</span></label>
-              <p class="hint" style="font-size:12px;color:var(--color-muted-foreground);margin:4px 0 0" data-i18n="upload.84">通常は、未使用の素材を使い、使った素材は「使用済み」フォルダへ移します。足りない分はその都度 Pexels からダウンロードします。オンにすると、未使用が足りないとき使用済みの素材を再利用します。</p>
-            </div></details>
-
-          <details class="group" open><summary><span data-i18n="upload.85">自動化</span><svg width="18" height="18"><use href="#i-down"/></svg></summary>
-            <div class="group-body">
-              <label class="check"><input type="checkbox" data-key="auto_publish"><span data-i18n="upload.86">公開キットを自動で作る(タイトル・説明文・タグ・サムネイル・投稿用フォルダ)</span></label>
-              <p class="hint" style="font-size:12px;color:var(--color-muted-foreground);margin:4px 0 0" data-i18n="upload.87">動画ができるたびに、手元の AI(Ollama)で公開用テキストとサムネイルを作り、ツールの中の「output/posting」フォルダも更新します。</p>
-              <label class="check" style="margin-top:8px"><input type="checkbox" data-key="qa"><span data-i18n="upload.88">品質チェックを自動で行う</span></label>
-              <p class="hint" style="font-size:12px;color:var(--color-muted-foreground);margin:4px 0 0" data-i18n="upload.89">動画と音声の長さ(差 0.5 秒以内)・ファイル全体のデコード・音声トラック・解像度・字幕の有無・宣伝の消し残しを確認します。結果は投稿ページに「品質OK / 要確認」で表示されます。</p>
-              <label class="check" style="margin-top:8px"><input type="checkbox" data-key="qa_sync"><span data-i18n="upload.90">字幕と声のずれも確認する(60 秒分・Whisper)</span></label>
-            </div></details>
-        </div>
-    </section>
-
     <!-- ================= CREATE ================= -->
     <section class="page" id="page-create" hidden aria-labelledby="h-create">
       <div class="page-head">
@@ -268,7 +124,7 @@
     <section class="page active" id="page-story" aria-labelledby="h-story">
       <div class="page-head">
         <div><h1 id="h-story" data-i18n="story.9">作成</h1>
-          <p class="lede" data-i18n="story.10">台本を入れるだけで、この Mac の音声モデル(Dia)で声を作り、映像・字幕(kinetic-captions)・BGM まで入った動画にします。台本は AI に下書きさせることもできます。録音した音声から作るときは「アップロード」へ。</p></div>
+          <p class="lede" data-i18n="story.10">台本を入れるだけで、この Mac の音声モデル(CosyVoice 2)で声を作り、映像・字幕(kinetic-captions)・BGM まで入った動画にします。台本は AI に下書きさせることもできます。</p></div>
       </div>
       <div class="grid-create">
         <div>
@@ -357,11 +213,6 @@
         <div class="card" id="story-settings">
           <div class="card-head"><h2 data-i18n="story.45">仕上がり</h2><span class="video-meta" data-i18n="story.46">この動画だけの設定</span></div>
 
-          <div class="field"><span class="label" id="l-story-preset" data-i18n="genre.title">ジャンル</span>
-            <div class="segmented" role="group" aria-labelledby="l-story-preset" id="story-preset">
-              <button data-v="auto" data-i18n="genre.auto">自動(台本から)</button><button data-v="bhatt" data-i18n="genre.bhatt">モチベーション</button></div>
-            <span class="hint" id="story-preset-hint"></span></div>
-
           <details class="group" open><summary><span data-i18n="story.49">声</span><svg width="18" height="18"><use href="#i-down"/></svg></summary>
             <div class="group-body">
               <div class="field"><span class="label" id="l-story-tts" data-i18n="story.50">声の作り方</span>
@@ -395,7 +246,7 @@
             <div class="group-body">
               <div class="field"><span class="label" id="l-story-visuals" data-i18n="story.56">絵の作り方</span>
                 <div class="segmented" role="group" aria-labelledby="l-story-visuals" id="story-visuals">
-                  <button data-v="folder" data-i18n="story.57">自分のフォルダ</button><button data-v="ai" data-i18n="story.58">AI イラスト</button><button data-v="stock" data-i18n="story.59">素材映像</button></div>
+                  <button data-v="folder" data-i18n="story.57">自分のフォルダ</button><button data-v="ai" data-i18n="story.58">AI イラスト</button><button data-v="stock" data-i18n="story.59">素材映像</button><button data-v="asset" data-i18n="story.asset">自動で選ぶ</button></div>
                 <span class="hint" id="story-ai-status"></span></div>
               <div class="field" id="story-folder-field"><label for="story-folder" data-i18n="story.60">素材フォルダ(動画・写真)</label>
                 <div class="row"><input id="story-folder" class="input" spellcheck="false" placeholder="/Users/…/Movies/素材" data-i18n-attr="placeholder:story.7">
@@ -429,7 +280,6 @@
               <p class="hint story-kc" style="font-size:12px;color:var(--color-muted-foreground);margin:0"><span data-i18n="settings.fonts_hint">フォントの追加・削除は</span> <a href="#settings" class="link-btn" data-i18n="settings.nav">設定</a></p>
               <div class="field story-kc"><div class="range-head"><label for="story-kc-size" data-i18n="story.89">文字の大きさ</label><output id="o-story-kc-size"></output></div>
                 <input type="range" id="story-kc-size" min="0.6" max="1.6" step="0.05"></div>
-              <p class="hint" style="font-size:12px;color:var(--color-muted-foreground);margin:0" data-i18n="story.90">見た目の細かい設定(シンプル)は「アップロード」ページの下にある「音声から作るときの見た目」の字幕設定が使われます。</p>
             </div></details>
 
           <details class="group" open><summary>BGM<svg width="18" height="18"><use href="#i-down"/></svg></summary>
@@ -586,7 +436,7 @@
             <div class="video-meta" data-i18n="settings.start_hint">アプリを開いたときに最初に出すページ</div></div>
             <select id="set-start" style="width:auto">
               <option value="last" data-i18n="settings.start_last">前回のページ</option>
-              <option value="story" data-i18n="app.7">作成</option><option value="upload" data-i18n="app.8">アップロード</option>
+              <option value="story" data-i18n="app.7">作成</option>
               <option value="library" data-i18n="app.9">素材</option><option value="videos" data-i18n="app.10">完成動画</option>
               <option value="posts" data-i18n="app.11">投稿</option><option value="rights" data-i18n="app.12">権利確認</option></select></div>
         </div>
@@ -623,7 +473,7 @@
             <div class="field"><span class="label" id="l-fin-look" data-i18n="finish.look">フィルター</span>
               <div class="look-grid" role="group" aria-labelledby="l-fin-look" id="fin-looks"></div></div>
             <div class="field"><span class="label" id="l-fin-art" data-i18n="finish.art">AI イラストの色</span>
-              <div class="segmented" role="group" aria-labelledby="l-fin-art" id="fin-art"><button data-v="genre" data-i18n="finish.art_genre">ジャンルに合わせる</button><button data-v="mono" data-i18n="finish.art_mono">白黒(墨)</button><button data-v="color" data-i18n="finish.art_color">カラー</button></div></div>
+              <div class="segmented" role="group" aria-labelledby="l-fin-art" id="fin-art"><button data-v="mono" data-i18n="finish.art_mono">白黒(墨)</button><button data-v="color" data-i18n="finish.art_color">カラー</button></div></div>
             <div class="field"><span class="label" id="l-fin-tr" data-i18n="finish.transition">絵の切り替え</span>
               <div class="segmented" role="group" aria-labelledby="l-fin-tr" id="fin-transition"><button data-v="crosszoom" data-i18n="finish.tr_cross">クロスズーム</button><button data-v="cut" data-i18n="finish.tr_cut">カット</button></div></div>
             <div class="field" data-fin-zoom><span class="label" id="l-fin-ts" data-i18n="finish.tr_speed">切り替えの速さ</span>
@@ -658,8 +508,7 @@
 </dialog>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script src="/static/i18n.js?v=20261105k"></script>
-<script src="/static/app.js?v=20261105k"></script>
-<script src="/static/inbox.js?v=20261105k"></script>
+<script src="/static/app.js?v=20261106a"></script>
 <script src="/static/posts.js?v=20261105k"></script>
 <script src="/static/rights.js?v=20261105k"></script>
 <script src="/static/story.js?v=20261105k"></script>

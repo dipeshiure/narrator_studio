@@ -311,7 +311,7 @@ def test_recover_registers_dropped_files_and_requeues(inbox, monkeypatch):
 
 def test_pexels_key_saved_to_env_never_returned(client, monkeypatch, tmp_path):
     monkeypatch.setattr(server, "HERE", tmp_path); monkeypatch.setattr(mv, "HERE", tmp_path)
-    monkeypatch.setattr(mv, "CONFIG", tmp_path / "nope.toml"); monkeypatch.delenv("PEXELS_API_KEY", raising=False)
+    monkeypatch.delenv("PEXELS_API_KEY", raising=False)
     assert client.get("/api/pexels-key").json == {"has_key": False}
     assert client.post("/api/pexels-key", json={"key": "x y"}).status_code == 400
     r = client.post("/api/pexels-key", json={"key": "A" * 56})
@@ -633,6 +633,14 @@ def test_story_settings_reject_bad_rate():
     _, s = server.story_settings({"preset": "bhatt", "options": {"tts_rate": "fast; rm", "voice": "x",
                                                                    "unknown": 1}})
     assert s["tts_rate"] == "+0%" and "unknown" not in s
+    _, listed = server.story_settings({"options": ["tts_speed", 9]})
+    assert listed["tts_speed"] == 1.0
+    _, weird = server.story_settings({"options": {"tts_speed": "nan"}})
+    assert weird["tts_speed"] == 1.0
+    _, fast = server.story_settings({"options": {"tts_speed": 99}})
+    assert fast["tts_speed"] == 1.5
+    _, slow = server.story_settings({"options": {"tts_speed": 0}})
+    assert slow["tts_speed"] == 0.5
 
 
 def test_caption_fonts_api(client):

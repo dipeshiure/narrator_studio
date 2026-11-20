@@ -132,7 +132,7 @@ def test_expected_length_without_render_record_uses_kept_ranges(made):
     (work / "render.json").unlink()
     mv.write_json(work / "analysis.json", {"total": 10.0, "sentences": [
         {"s": 0, "e": 2, "cut": True}, {"s": 2.5, "e": 10, "cut": False}]})
-    assert qa.expected_audio(audio, work, mv.load_settings()) == pytest.approx(10 - 2.35)
+    assert qa.expected_audio(audio, work, {**mv.load_settings(), "trim_ads": True}) == pytest.approx(10 - 2.35)
 
 
 def test_match_offsets_uses_nearest_identical_sequence():
@@ -147,5 +147,5 @@ def test_caption_words_fallback_for_older_renders(made):
     mv.write_json(work / "words_voice.json", WORDS)
     mv.write_json(work / "analysis.json", {"source": "voice", "total": 10.0, "sentences": [
         {"s": 0.0, "e": 0.9, "cut": True}, {"s": 1.0, "e": 10.0, "cut": False}]})
-    words = qa.caption_words(work, mv.load_settings())
+    words = qa.caption_words(work, {**mv.load_settings(), "trim_ads": True})
     assert words[0]["w"] == "up" and words[0]["s"] == pytest.approx(0.1)   # cut words dropped, timeline shifted

@@ -33,7 +33,7 @@ removed from the narration; they apply to the paragraph they are written in:
   [[query:factory sensor line]]
   [[chart:bar|Operating margin (%)|Keyence=55,Toyota=10|%|FY2023 annual reports]]
 """
-import argparse, asyncio, json, math, random, re, subprocess, sys, time
+import argparse, asyncio, json, math, queue, random, re, subprocess, sys, threading, time
 from pathlib import Path
 
 import commons
@@ -56,8 +56,8 @@ STORY_DEFAULTS = {
     "tts_pitch": "+0Hz",             # lower = deeper voice, e.g. "-6Hz"
     "visuals": "stock",              # stock (Pexels) / ai (ink illustrations, illustrate.py) / folder (your own media)
     "media_folder": "",              # folder: your clips / photos, matched to each paragraph by meaning (media_match.py)
-    "image_seconds": 9.0,            # ai: one illustration per this many seconds of narration (later in the video)
-    "hook_seconds": 3.0,             # ai: ...but this often at the start (attention)
+    "image_seconds": 5.5,            # ai: one illustration per ~5-6s of narration (was 9; Shorts feel static otherwise)
+    "hook_seconds": 3.0,             # ai: faster cuts at the start (attention)
     "hook_until": 45.0,              # ai: fast cuts last this many seconds
     "hook_ramp": 120.0,              # ai: then relax to image_seconds over this many seconds
     "image_steps": 2,                # ai: FLUX.1-schnell steps (2 looks the same as 4 here, 1.5x faster)
@@ -66,6 +66,7 @@ STORY_DEFAULTS = {
     "grain": False,                  # film grain on every shot
     "show_headings": True,           # section headings ("## ...") on screen
     "heading_seconds": 3.5,          # how long a section heading stays on screen
+    "fade_in": 0.15,                 # short: first frame already shows the picture (inbox uses longer)
     "chart_theme": {"bg": "0E1116", "fg": "FFFFFF", "accent": "FFC800", "grid": "2A2F38"},
 }
 
@@ -73,7 +74,12 @@ STORY_DEFAULTS = {
 # ---------------------------------------------------------------- script
 
 def slug(text):
-    return re.sub(r"[^A-Za-z0-9]+", "_", text).strip("_")[:60] or "story"
+    """A file-safe name. English titles stay readable. A title with no letters or digits
+    (Japanese, or only punctuation) gets its own short id, so two of them do not share one file."""
+    base = re.sub(r"[^A-Za-z0-9]+", "_", str(text or "")).strip("_")[:60]
+    if base:
+        return base
+    return "story_" + mv.hashlib.md5(str(text or "").encode()).hexdigest()[:8]
 
 
 TAG = re.compile(r"\[\[(\w+):([^\]]*)\]\]")
@@ -177,9 +183,13 @@ def group_scenes(scenes):
 def load_script(path):
     path = Path(path)
     if path.suffix == ".json":
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text() or "null")
+        if not isinstance(data, dict):
+            raise ValueError(f"{path.name}: title と scenes(text) が必要です")
     else:
         lines = path.read_text().splitlines()
+        if not lines:
+            raise ValueError(f"{path.name}: title と scenes(text) が必要です")
         data = {"title": lines[0].strip(), "scenes": []}
         heading, para = None, []
 
@@ -196,7 +206,12 @@ def load_script(path):
                 flush()
             else:
                 para.append(line)
-    for sc in data.get("scenes", []):
+    raw_scenes = data.get("scenes") or []
+    if not isinstance(raw_scenes, list):
+        raise ValueError(f"{path.name}: scenes は text を持つ項目の並びです")
+    for sc in raw_scenes:
+        if not isinstance(sc, dict):
+            raise ValueError(f"{path.name}: scenes の各項目は text を持つ必要があります")
         sc["text"], tags = parse_tags(sc.get("text", ""), path.name)
         for k, v in tags.items():
             sc.setdefault(k, v)                       # explicit JSON fields win over inline tags
@@ -238,11 +253,19 @@ RETENTION = {
 }
 
 
-def _ollama(prompt, model, as_json=False, timeout=600):
+def _ollama(prompt, model, as_json=False, timeout=600, system=None, temperature=0.8, keep_alive=0, schema=None):
+    """One Ollama chat call. `system` is the system role (the per-video direction). `as_json`
+    sets format=json; `schema` sets a JSON schema instead. num_ctx stays 8192 so a long script still fits."""
     import prep, urllib.request
-    body = {"model": model, "stream": False, "keep_alive": 0, "messages": [{"role": "user", "content": prompt}],
-            "options": {"temperature": 0.8, "num_ctx": 8192}}
-    if as_json:
+    messages = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
+    body = {"model": model, "stream": False, "keep_alive": keep_alive, "messages": messages,
+            "options": {"temperature": temperature, "num_ctx": 8192}}
+    if schema is not None:
+        body["format"] = schema
+    elif as_json:
         body["format"] = "json"
     req = urllib.request.Request(prep.OLLAMA, json.dumps(body).encode(), {"Content-Type": "application/json"})
     return json.load(urllib.request.urlopen(req, timeout=timeout))["message"]["content"]
@@ -502,21 +525,94 @@ async def _edge(text, voice, rate, dest, pitch="+0Hz"):
     return bounds
 
 
+def _norm_word(w):
+    return re.sub(r"[^a-z0-9]", "", str(w).lower())
+
+
+def _same_word(heard, script):
+    """True when a heard token is the script token (spelling, a number, or one letter off)."""
+    if not heard or not script:
+        return False
+    if heard == script:
+        return True
+    short, long = (heard, script) if len(heard) <= len(script) else (script, heard)
+    if long.startswith(short) and (len(short) >= 3 or len(heard) == len(script)):
+        return True
+    if min(len(heard), len(script)) < 4 or abs(len(heard) - len(script)) > 1:
+        return False
+    if len(heard) == len(script):
+        return sum(a != b for a, b in zip(heard, script)) == 1
+    i = j = diff = 0
+    while i < len(long) and j < len(short):
+        if long[i] != short[j]:
+            diff += 1
+            if diff > 1:
+                return False
+            i += 1
+        else:
+            i += 1
+            j += 1
+    return True
+
+
 def script_words(text, bounds):
-    """Put the script's own spelling and punctuation back on the TTS word timings
-    (subtitles then match the script exactly, e.g. '$4.8' instead of a transcription guess)."""
-    norm = lambda w: re.sub(r"[^a-z0-9]", "", w.lower())
-    tokens, ti, words = text.split(), 0, []
+    """Time the script's own words against what was heard.
+
+    Captions use the script spelling. A heard word that is not in the script
+    (Whisper's "1." in a pause, an extra "pause") is dropped. A script word the
+    ear missed stays, timed in the gap before the next word that did match."""
+    tokens = text.split()
+    ti, words, last_end = 0, [], 0.0
     for b, st, en in bounds:
-        nb, word = norm(b), b
+        try:
+            st, en = float(st), float(en)
+        except (TypeError, ValueError):
+            continue
+        if st != st or en != en:               # NaN timings cannot place a caption
+            continue
+        heard = str(b).split()
+        if not heard:
+            continue
+        found = None
         for j in range(ti, min(ti + 4, len(tokens))):
-            nt = norm(tokens[j])
-            if nb and nt and (nt.startswith(nb) or nb.startswith(nt)):
-                k = max(1, len(b.split()))            # one boundary can cover "In 2004"
-                word, ti = " ".join(tokens[j:j + k]), j + k
+            if _same_word(_norm_word(heard[0]), _norm_word(tokens[j])):
+                found = j
                 break
-        words.append({"w": word, "s": round(st, 3), "e": round(en, 3)})
+        if found is None:
+            continue
+        if found > ti:
+            gap_s, gap_e = last_end, float(st)
+            step = max(0.05, gap_e - gap_s) / (found - ti)
+            for k in range(ti, found):
+                words.append({"w": tokens[k], "s": round(gap_s + (k - ti) * step, 3),
+                              "e": round(gap_s + (k - ti + 1) * step, 3)})
+        take = 1
+        if len(heard) > 1:
+            take = min(len(heard), len(tokens) - found)
+            for p, tok in zip(heard[1:], tokens[found + 1:found + take]):
+                if not _same_word(_norm_word(p), _norm_word(tok)):
+                    take = 1
+                    break
+        words.append({"w": " ".join(tokens[found:found + take]), "s": round(float(st), 3), "e": round(float(en), 3)})
+        ti = found + take
+        last_end = float(en)
+    if ti < len(tokens):
+        step = 0.2
+        for k, tok in enumerate(tokens[ti:]):
+            words.append({"w": tok, "s": round(last_end + k * step, 3), "e": round(last_end + (k + 1) * step, 3)})
     return words
+
+
+def _caption_follows_script(words, text):
+    """True when every caption token is the next script token, and none are left over."""
+    tokens = [_norm_word(t) for t in text.split()]
+    i = 0
+    for w in words or []:
+        for part in str(w.get("w", "")).split():
+            if i >= len(tokens) or not _same_word(_norm_word(part), tokens[i]):
+                return False
+            i += 1
+    return i == len(tokens)
 
 
 def tts(text, dest, s, voice):
@@ -547,6 +643,10 @@ def tts(text, dest, s, voice):
         subprocess.run(["say", "-o", str(raw), text], check=True)
     mv.run(["ffmpeg", "-y", "-i", str(raw), "-ar", "44100", "-ac", "1", str(dest)])
     raw.unlink(missing_ok=True)
+    removed = trim_lead_silence(dest)
+    if words and removed:
+        words = [{"w": w["w"], "s": round(max(0.0, w["s"] - removed), 3),
+                  "e": round(max(0.0, w["e"] - removed), 3)} for w in words]
     return words
 
 
@@ -586,10 +686,66 @@ def cosy_available():
     return COSY_PY.exists() and COSY_BATCH.exists() and (COSY_MODEL / "cosyvoice2.yaml").exists()
 
 
+def narration_usable(path, text, speed=1.0):
+    """True when path is a usable scene wav for this text (else drop the bad cache).
+
+    Catches empty files and CosyVoice's intermittent too-short / too-long clips so the next
+    run remakes them instead of keeping a broken narration forever. `speed` is the CosyVoice
+    tempo already baked into the file (1.5x speech is shorter on disk)."""
+    path = Path(path)
+    if not path.exists() or path.stat().st_size < 1000:
+        return False
+    try:
+        dur = mv.duration(path)
+    except Exception:
+        dur = 0.0
+    words = max(1, len(re.findall(r"[A-Za-z0-9']+", text or "")))
+    tempo = max(0.5, min(1.5, float(speed or 1.0)))
+    min_dur = max(0.35, words * 0.18) / tempo
+    max_dur = (words * 1.25 + 2.5) / tempo
+    if dur < min_dur or dur > max_dur:
+        path.unlink(missing_ok=True)
+        path.with_suffix(".words.json").unlink(missing_ok=True)
+        path.with_suffix(".heard.json").unlink(missing_ok=True)
+        return False
+    return True
+
+
+def trim_lead_silence(path, keep=0.05, threshold="-35dB"):
+    """Cut the hush CosyVoice leaves before the first word. Returns seconds removed.
+
+    CosyVoice's lead-in is soft noise (~-30 dB), not digital zero — RMS detection at
+    -35 dB catches it; peak at -42 dB does not. Keeps `keep` seconds so consonants are
+    not clipped. Word/heard caches are dropped when anything meaningful is cut."""
+    path = Path(path)
+    if not path.exists():
+        return 0.0
+    before = mv.duration(path)
+    tmp = path.with_name(path.stem + ".trim.wav")
+    try:
+        mv.run(["ffmpeg", "-y", "-i", str(path),
+                "-af", (f"silenceremove=start_periods=1:start_silence={keep:.3f}:"
+                        f"start_threshold={threshold}:detection=rms"),
+                "-ar", "44100", "-ac", "1", str(tmp)])
+        after = mv.duration(tmp)
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        return 0.0
+    removed = before - after
+    if removed < 0.04 or after < 0.2:
+        tmp.unlink(missing_ok=True)
+        return 0.0
+    tmp.replace(path)
+    path.with_suffix(".words.json").unlink(missing_ok=True)
+    path.with_suffix(".heard.json").unlink(missing_ok=True)
+    return round(removed, 3)
+
+
 def cosy_voice(scenes, wavs, s, log=print):
-    """Voice every scene without a wav with CosyVoice 2 (tools/cosy_batch.py): one reference clip for
-    the whole video (a built-in or recorded voice), then word timings."""
-    todo = [(sc, w) for sc, w in zip(scenes, wavs) if not w.exists()]
+    """Voice every scene without a good wav with CosyVoice 2 (tools/cosy_batch.py): one reference
+    clip for the whole video (a built-in or recorded voice), then word timings."""
+    speed = float(s.get("tts_speed", 1.0))
+    todo = [(sc, w) for sc, w in zip(scenes, wavs) if not narration_usable(w, sc["text"], speed)]
     if todo:
         mine = my_voice(s.get("voice_id")) or my_voice(DEFAULT_VOICE)
         if not mine:
@@ -597,7 +753,7 @@ def cosy_voice(scenes, wavs, s, log=print):
         ref, ref_text = str(mine[0]), mine[1]["text"]
         job = wavs[0].parent / "cosy_job.json"
         mv.write_json(job, {"repo": str(COSY_REPO), "model": str(COSY_MODEL), "ref_audio": str(ref),
-                            "ref_text": ref_text, "speed": float(s.get("tts_speed", 1.0)),
+                            "ref_text": ref_text, "speed": speed,
                             "items": [{"text": sc["text"], "out": str(w)} for sc, w in todo]})
         log(f"  ナレーションを作成中(CosyVoice 2・この Mac の GPU): {len(todo)} 段落")
         proc = subprocess.Popen([str(COSY_PY), str(COSY_BATCH), str(job)], cwd=HERE, stdout=subprocess.PIPE,
@@ -614,17 +770,38 @@ def cosy_voice(scenes, wavs, s, log=print):
         if proc.wait() != 0:
             raise RuntimeError("CosyVoice でナレーションを作れませんでした: " + " / ".join(tail[-2:]))
         job.unlink(missing_ok=True)
+    bad = [w.name for sc, w in zip(scenes, wavs) if not narration_usable(w, sc["text"], speed)]
+    if bad:
+        raise RuntimeError("CosyVoice の音声が不完全です: " + ", ".join(bad[:4]))
+    trimmed = sum(trim_lead_silence(w) > 0 for w in wavs)
+    if trimmed:
+        log(f"  先頭の無音を削りました({trimmed} 段落)")
     write_words(scenes, wavs)
 
 
 def write_words(scenes, wavs):
-    """Per-scene word timings (Whisper), carrying the script's own spelling."""
+    """Per-scene word timings (Whisper), carrying the script's own spelling.
+
+    Every clip that still needs a listen is sent through one Whisper load, then that
+    process exits so the voice model and the picture model are never in memory together."""
+    pending = []
     for sc, w in zip(scenes, wavs):
         wj = w.with_suffix(".words.json")
         hj = w.with_suffix(".heard.json")             # Whisper timings
-        if not wj.exists():
-            heard = mv.read_json(hj, None) or mv.whisper_words(w, "base")   # timing only: spelling from the script
+        cached = mv.read_json(wj, None)
+        if cached and _caption_follows_script(cached, sc["text"]):
+            continue
+        heard = mv.read_json(hj, None)
+        if heard:
             mv.write_json(wj, script_words(sc["text"], [(x["w"], x["s"], x["e"]) for x in heard]) or None)
+        else:
+            pending.append((sc, w, wj, hj))
+    if pending:
+        heards = mv.whisper_words_many([w for _, w, _, _ in pending], "base")
+        for (sc, w, wj, hj), heard in zip(pending, heards):
+            mv.write_json(hj, heard)
+            mv.write_json(wj, script_words(sc["text"], [(x["w"], x["s"], x["e"]) for x in heard]) or None)
+    free_models()
 
 
 def free_models():
@@ -757,6 +934,36 @@ def render_photo(jpg, seconds, dest, s, n=0, trim=0.0):
             "-c:v", "h264_videotoolbox", "-b:v", s["bitrate"], str(dest)])
 
 
+def _run_ffmpeg(cmds):
+    """Encode clips that do not depend on each other. Two at a time uses the hardware encoder, not a second model."""
+    if len(cmds) <= 1:
+        for _seg, cmd in cmds:
+            mv.run(cmd)
+        return
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(2) as ex:
+        list(ex.map(lambda item: mv.run(item[1]), cmds))
+
+
+def encode_ready_art(item, scenes, s, work, crosszoom):
+    """Turn one finished illustration into its clip. Safe to run while the next picture is still drawing."""
+    i, k, n = item["scene"], item["shot"], item["shots"]
+    sc = scenes[i]
+    if sc.get("chart") or n < 1:
+        return None
+    planned = sc.get("shots") if sc.get("shots") and len(sc["shots"]) == n else None
+    even = float(sc["dur"]) / n
+    each = (float(planned[k]["end"]) - float(planned[k]["start"]) if planned else even)
+    each += float(s["cross"]) if crosszoom else 0
+    if each <= 0.05:
+        each = even
+    seg = work / f"s{i:03d}_a{k:02d}.mp4"
+    import illustrate
+    pic = illustrate.trim_bands(item["path"], work / f"s{i:03d}_a{k:02d}.png")
+    render_photo(pic, each, seg, s, n=i + k, trim=0.07)
+    return seg
+
+
 def join_crosszoom(segs, s, work, group=10):
     """Join clips with a dissolve while both pictures are zooming around the chosen anchor (the clips
     alternate push-in / pull-out, so the scale matches across the overlap: a cross zoom). Every clip was
@@ -788,6 +995,24 @@ def join_crosszoom(segs, s, work, group=10):
             nxt.append(chain(part, work / f"xf{tag}_{k // group:03d}.mp4") if len(part) > 1 else part[0])
         level, tag = nxt, tag + 1
     return level[0]
+
+
+def mux_audio(lst, voice, music, total, s, dest, vf=None):
+    """Join the clips and lay the voice on them. With vf, re-encode the picture.
+    Without vf, copy the picture (the caption pass encodes it once, a moment later)."""
+    cmd = ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(lst), "-i", str(voice)]
+    if music:
+        cmd += ["-stream_loop", "-1", "-i", music["path"],
+                "-filter_complex", mv.bgm_filter("1:a", "2:a", total, 1.0, s)]
+        if vf:
+            cmd += ["-vf", vf]
+        cmd += ["-map", "0:v", "-map", "[a]"]
+    else:
+        if vf:
+            cmd += ["-vf", vf]
+        cmd += ["-af", "loudnorm=I=-14:TP=-1.5:LRA=11", "-map", "0:v", "-map", "1:a"]
+    video = ["-c:v", "h264_videotoolbox", "-b:v", s["bitrate"]] if vf else ["-c:v", "copy"]
+    mv.run(cmd + video + ["-c:a", "aac", "-b:a", "192k", "-shortest", str(dest)])
 
 
 def photo_shots(sc, used, log=print, shot=5.0):
@@ -890,6 +1115,52 @@ def write_publish(data, chapters, dest_md, dest_json, video=None):
                        f"## Tags\n\n{', '.join(meta['tags'])}\n")
 
 
+def fill_asset_images(picks, scenes, s, work, log=print):
+    """Draw an AI picture only for scenes the asset engine could not match. The other modes are untouched."""
+    need = [i for i, p in picks.items() if p.get("kind") == "ai"]
+    if not need:
+        return picks
+    import illustrate
+    if not illustrate.available():
+        log("  ! AI イラストのモデルがまだ準備できていないので、白黒の素材映像で作ります")
+        for i in need:
+            picks.pop(i, None)
+        return picks
+    subset = []
+    for i in need:
+        prompt = picks[i].get("prompt") or scenes[i].get("query") or "a quiet scene"
+        one = dict(scenes[i])
+        one["image_prompt"] = prompt
+        one["shots"] = [{"prompt": prompt, "start": 0.0, "end": float(scenes[i].get("dur") or 1)}]
+        subset.append(one)
+    s2 = {**s, "_from_timeline": True, "_work": str(work)}
+    try:
+        mv.unload_llm()
+    except Exception:
+        pass
+    art = illustrate.illustrate(subset, s2, log)
+    for j, i in enumerate(need):
+        paths = art.get(j) or []
+        if paths:
+            picks[i] = {"kind": "image", "path": str(paths[0]), "dur": scenes[i].get("dur"), "credit": "", "label": "AI"}
+        else:
+            picks.pop(i, None)
+    return picks
+
+
+def render_asset_shot(i, sc, sh, work, s, grade):
+    """One chosen file, shown for the length of the narration. Uses the existing still and clip encoders."""
+    dur = float(sc["dur"])
+    seg = work / f"s{i:03d}_asset.mp4"
+    if sh["kind"] == "image":
+        render_photo(sh["path"], dur, seg, s, n=i)
+    else:
+        mv.run(["ffmpeg", "-y", "-stream_loop", "-1", "-ss", f"{float(sh.get('start') or 0):.2f}", "-i", str(sh["path"]),
+                "-t", f"{dur:.3f}", "-an", "-vf", grade, "-c:v", "h264_videotoolbox",
+                "-b:v", s["bitrate"], str(seg)])
+    return seg
+
+
 # ---------------------------------------------------------------- render
 
 def make_story(script, outdir, s, log=print):
@@ -898,6 +1169,7 @@ def make_story(script, outdir, s, log=print):
     # one heavy render at a time on this Mac (CosyVoice, FLUX, Whisper and CLIP all share the
     # 24 GB of unified memory; two at once is what pushed it deep into swap)
     lock = mv.TMP / "heavy.lock"
+    lock.parent.mkdir(parents=True, exist_ok=True)
     lk = open(lock, "w")
     try:
         try:
@@ -949,7 +1221,11 @@ def _make_story(script, outdir, s, log=print):
         cosy_voice(scenes, wavs, s, log)
     for i, (sc, wav) in enumerate(zip(scenes, wavs)):
         wj = wav.with_suffix(".words.json")
-        if not wav.exists():
+        if engine == "cosy":
+            if not narration_usable(wav, sc["text"], float(s.get("tts_speed", 1.0))):
+                raise RuntimeError(f"ナレーションが欠けています({wav.name})")
+        elif not wav.exists():
+            # edge / say: one voice for the whole video (never mix engines mid-script)
             mv.write_json(wj, tts(sc["text"], wav, {**s, "tts_engine": engine}, voice))
         sc["words"] = mv.read_json(wj, None)
         sc["dur"] = mv.duration(wav) + GAP
@@ -968,9 +1244,18 @@ def _make_story(script, outdir, s, log=print):
     total = mv.duration(voice_wav)
 
     # 2. visuals: original ink illustrations (ai), footage matched to each scene, or a chart
-    log("  映像を準備しています(場面ごとの検索語を決めています)")
-    plan_queries(scenes, s, log)
-    art, own = {}, {}
+    asset_picks = {}
+    if s.get("visuals") == "asset":
+        import asset_engine
+        log("  ストック素材を場面ごとに選んでいます")
+        asset_picks = fill_asset_images(asset_engine.choose(scenes, s, work, log), scenes, s, work, log)
+    elif s.get("visuals") != "ai":
+        log("  映像を準備しています(場面ごとの検索語を決めています)")
+        plan_queries(scenes, s, log)
+        mv.unload_llm()
+    art, own, art_segs = {}, {}, {}
+    finish = mv.load_finish()                          # Settings: one look for every video
+    crosszoom = finish["transition"] == "crosszoom" and s.get("visuals") == "ai"
     if s.get("visuals") == "folder":
         import media_match
         folder = str(s.get("media_folder") or "").strip()
@@ -984,20 +1269,52 @@ def _make_story(script, outdir, s, log=print):
     if s.get("visuals") == "ai":
         import illustrate
         if illustrate.available():
-            if s.get("preset_id") == "auto":
-                art_direction(data, s, work, log)    # the AI reads the script and picks the look
             s["_work"] = str(work)                   # the picture plan (shots.json) is kept with the video's work files
-            illustrate.plan(scenes, s, log)          # LLM first, then free it for FLUX
-            mv.memory_gate(log)
-            art = illustrate.illustrate([sc for sc in scenes], s, log)
+            art_q, art_segs, art_err = queue.Queue(), {}, []
+
+            def _encode_art():
+                while True:
+                    item = art_q.get()
+                    if item is None:
+                        return
+                    try:
+                        seg = encode_ready_art(item, scenes, s, work, crosszoom)
+                        if seg:
+                            art_segs[(item["scene"], item["shot"])] = seg
+                    except Exception as e:
+                        art_err.append(str(e))
+
+            art_thread = threading.Thread(target=_encode_art, daemon=True)
+            art_thread.start()
+            try:
+                mv.memory_gate(log)
+                log("  できた絵から、動画への変換を同時に進めます")
+                art = illustrate.illustrate([sc for sc in scenes], s, log, on_image=art_q.put)
+            finally:
+                art_q.put(None)
+                art_thread.join()
+            if art_err:
+                log(f"  ! 絵の動画化をやり直します({art_err[0]})")
+                art_segs.clear()
         else:
             log("  ! AI イラストのモデルがまだ準備できていないので、白黒の素材映像で作ります")
-    finish = mv.load_finish()                          # Settings: one look for every video
-    crosszoom = finish["transition"] == "crosszoom" and s.get("visuals") == "ai"
+        bare = [sc for i, sc in enumerate(scenes)
+                if i not in art and not sc.get("chart") and not sc.get("photo") and not sc.get("query")]
+        if bare:
+            log("  絵が足りない場面だけ、素材の検索語を作ります")
+            plan_queries(bare, s, log)
+            mv.unload_llm()
     grade, segs, first_clip = mv.grade_filter(s), [], None
     used_photos, credits, photo_credits = set(), [], []
     for i, sc in enumerate(scenes):
         if i in art and not sc.get("chart"):
+            ready = [art_segs.get((i, j)) for j in range(len(art[i]))]
+            if ready and all(ready):
+                segs.extend(ready)
+                first_clip = first_clip or art[i][0]
+                if i % 10 == 0 or i == len(scenes) - 1:
+                    log(f"  シーン {i + 1}/{len(scenes)}: イラスト {len(art[i])} 枚")
+                continue
             planned = sc.get("shots") if sc.get("shots") and len(sc["shots"]) == len(art[i]) else None
             even = sc["dur"] / len(art[i])
             for j, png in enumerate(art[i]):
@@ -1037,6 +1354,15 @@ def _make_story(script, outdir, s, log=print):
             first_clip = first_clip or shots[0][0]["path"]
             log(f"  シーン {i + 1}/{len(scenes)}: 写真「{sc['photo']}」 {len(shots)} 枚")
             continue
+        if i in asset_picks and not sc.get("chart") and not sc.get("photo"):
+            sh = asset_picks[i]
+            seg = render_asset_shot(i, sc, sh, work, s, grade)
+            segs.append(seg)
+            if sh.get("credit"):
+                credits.append((sc["start"], float(sc["dur"]), sh["credit"]))
+            first_clip = first_clip or sh["path"]
+            log(f"  シーン {i + 1}/{len(scenes)}: {sh.get('label') or Path(sh['path']).name}")
+            continue
         if sc.get("chart"):
             seg = work / f"s{i:03d}_chart.mp4"
             render_chart(sc["chart"], sc["dur"], seg, s)
@@ -1054,17 +1380,22 @@ def _make_story(script, outdir, s, log=print):
         if not clips:
             raise RuntimeError("素材がありません")
         first_clip = first_clip or clips[0]
+        cmds = []
         for j, d in enumerate(lengths):
             src = clips[j % len(clips)]
             start = random.uniform(0, max(0, mv.duration(src) - d - 0.1))
             seg = work / f"s{i:03d}_{j:02d}.mp4"
-            mv.run(["ffmpeg", "-y", "-ss", f"{start:.2f}", "-t", f"{d:.3f}", "-i", str(src), "-an",
-                    "-vf", grade, "-c:v", "h264_videotoolbox", "-b:v", s["bitrate"], str(seg)])
-            segs.append(seg)
+            cmds.append((seg, ["ffmpeg", "-y", "-ss", f"{start:.2f}", "-t", f"{d:.3f}", "-i", str(src), "-an",
+                               "-vf", grade, "-c:v", "h264_videotoolbox", "-b:v", s["bitrate"], str(seg)]))
+        _run_ffmpeg(cmds)
+        segs.extend(seg for seg, _cmd in cmds)
         log(f"  シーン {i + 1}/{len(scenes)}: 「{sc['query']}」 {len(lengths)} カット")
 
     # 3. subtitles (Whisper on our own narration) + section headings
-    vf = f"fade=t=in:d={min(float(s['fade_in']), 1.0):.2f},fade=t=out:st={total - 1.0:.2f}:d=1.0"
+    # Short fade-in: a 1s fade left the first ~0.2s black (picture and captions invisible).
+    fi = max(0.0, min(float(s.get("fade_in", 0.15)), 0.35))
+    vf = ((f"fade=t=in:d={fi:.2f}," if fi > 0.02 else "")
+          + f"fade=t=out:st={total - 1.0:.2f}:d=1.0")
     look = mv.finish_filter(finish)
     if look:
         vf += "," + look
@@ -1096,26 +1427,28 @@ def _make_story(script, outdir, s, log=print):
         segs = [join_crosszoom(segs, s, work)]
     lst = work / "list.txt"
     lst.write_text("".join(f"file '{p}'\n" for p in segs))
-    log("  最終エンコード中...")
     music = mv.pick_music(total, s, log) if s.get("bgm") else None
-    cmd = ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(lst), "-i", str(voice_wav)]
-    if music:
-        cmd += ["-stream_loop", "-1", "-i", music["path"],
-                "-filter_complex", mv.bgm_filter("1:a", "2:a", total, 1.0, s), "-vf", vf,
-                "-map", "0:v", "-map", "[a]"]
-    else:
-        cmd += ["-vf", vf, "-af", "loudnorm=I=-14:TP=-1.5:LRA=11", "-map", "0:v", "-map", "1:a"]
     Path(outdir).mkdir(parents=True, exist_ok=True)
     tmp_out = work / "out.mp4"
-    mv.run(cmd + ["-c:v", "h264_videotoolbox", "-b:v", s["bitrate"], "-c:a", "aac", "-b:a", "192k",
-                  "-shortest", str(tmp_out)])
+    kc_vf = None
+    if kinetic:
+        log("  音声を重ねています...")
+        try:
+            mux_audio(lst, voice_wav, music, total, s, tmp_out)
+            kc_vf = vf          # fade and colour happen while the captions are drawn
+        except subprocess.CalledProcessError:
+            log("  最終エンコード中...")
+            mux_audio(lst, voice_wav, music, total, s, tmp_out, vf)
+    else:
+        log("  最終エンコード中...")
+        mux_audio(lst, voice_wav, music, total, s, tmp_out, vf)
     if kinetic:
         log("  kinetic-captions で字幕を入れています...")
         ks = dict(s)
         if heads and ks.get("kc_position", "auto") == "auto":
             ks["kc_position"] = "center"     # headings sit top-left: keep captions off them
         plain, tmp_out = tmp_out, work / "out_kc.mp4"
-        mv.burn_kinetic(plain, words, tmp_out, ks, work, log)
+        mv.burn_kinetic(plain, words, tmp_out, ks, work, log, vf=kc_vf)
         plain.unlink(missing_ok=True)
     tmp_out.replace(out)
 

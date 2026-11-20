@@ -13,7 +13,7 @@
   "voice": "en-US-ChristopherNeural",
   "tts_rate": "+0%",
   "tts_pitch": "+0Hz",
-  "visuals": "ai",
+  "visuals": "asset",
   "image_seconds": 9.0,
   "image_steps": 2,
   "hero": "none",

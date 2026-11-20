@@ -45,7 +45,7 @@ $('#set-lang').addEventListener('change', e => I18N.set(e.target.value));
 
 // ---------------------------------------------------------------- settings page
 // display choices live in localStorage (this browser), like the language
-const PAGES = ['story', 'upload', 'library', 'videos', 'posts', 'rights', 'settings'];
+const PAGES = ['story', 'library', 'videos', 'posts', 'rights', 'settings'];
 $('#set-theme').value = localStorage.getItem('theme') || 'dark';
 $('#set-theme').addEventListener('change', e => {
   localStorage.setItem('theme', e.target.value); applyTheme();
@@ -100,7 +100,7 @@ function changeFinish(patch) {
 }
 $('#fin-looks').addEventListener('click', e => { const b = e.target.closest('button'); if (b) changeFinish({ look: b.dataset.look, saturation: 1, contrast: 1, brightness: 0, warmth: 0 }); });
 FIN_SEGS.forEach(k => $('#fin-' + k).addEventListener('click', e => { const b = e.target.closest('button'); if (b) changeFinish({ [k]: b.dataset.v }); }));
-$('#fin-reset').addEventListener('click', () => changeFinish({ look: 'original', saturation: 1, contrast: 1, brightness: 0, warmth: 0, art: 'genre', transition: 'crosszoom', transition_speed: 'normal', zoom_amount: 'normal', zoom_focus: 'face' }));
+$('#fin-reset').addEventListener('click', () => changeFinish({ look: 'original', saturation: 1, contrast: 1, brightness: 0, warmth: 0, art: 'color', transition: 'crosszoom', transition_speed: 'normal', zoom_amount: 'normal', zoom_focus: 'face' }));
 
 // ---------------------------------------------------------------- navigation
 let current = 'story';
@@ -109,7 +109,7 @@ function show(page) {
   $$('.nav button').forEach(b => b.dataset.page === page ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'));
   $$('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + page));
   history.replaceState(null, '', '#' + page);
-  ({ upload: () => window.loadInbox && loadInbox(), story: () => window.loadStory && loadStory(), auto: loadAuto, library: loadLibrary, videos: loadVideos, posts: () => window.loadPosts && loadPosts(), rights: () => window.loadRights && loadRights(), settings: loadSettings }[page] || (() => {}))();
+  ({ story: () => window.loadStory && loadStory(), auto: loadAuto, library: loadLibrary, videos: loadVideos, posts: () => window.loadPosts && loadPosts(), rights: () => window.loadRights && loadRights(), settings: loadSettings }[page] || (() => {}))();
 }
 $$('.nav button').forEach(b => b.addEventListener('click', () => show(b.dataset.page)));
 addEventListener('hashchange', () => {
@@ -162,6 +162,7 @@ function paintSettings() {
 }
 function paintPreview() {
   const p = $('#preview'), c = $('#preview-caption');
+  if (!p || !c) return;
   p.classList.toggle('portrait', S.aspect === '9:16');
   if (!S.subs) { c.innerHTML = ''; return; }
   const words = ['never', 'give', 'up', 'on', 'yourself'];
@@ -204,23 +205,26 @@ addEventListener('pagehide', () => {
   if (saveTimer) { clearTimeout(saveTimer); postBeacon('/api/settings', S); }
   flushUI(true);
 });
-$$('#settings details.group').forEach(d => d.addEventListener('toggle', () =>
-  saveUI({ open_groups: $$('#settings details.group[open] > summary').map(s => s.textContent.trim()) })));
-$('#settings').addEventListener('input', e => {
-  const el = e.target, k = el.dataset.key; if (!k) return;
-  const v = el.type === 'checkbox' ? el.checked : el.type === 'color' ? el.value.slice(1).toUpperCase()
-    : el.type === 'range' ? Number(el.value) : el.value;
-  setSetting(k, v);
-});
-$('#settings').addEventListener('click', e => {
-  const b = e.target.closest('[data-seg] button'); if (!b || b.disabled) return;
-  const k = b.parentElement.dataset.seg;
-  setSetting(k, k === 'alignment' ? Number(b.dataset.v) : b.dataset.v);
-});
-$('#reset-settings').addEventListener('click', async () => {
-  if (!confirm(t('js.app.reset_confirm'))) return;
-  S = await api('/api/settings/reset', { method: 'POST' }); paintSettings(); toast(t('js.app.reset_done'));
-});
+const settingsRoot = $('#settings');
+if (settingsRoot) {
+  $$('#settings details.group').forEach(d => d.addEventListener('toggle', () =>
+    saveUI({ open_groups: $$('#settings details.group[open] > summary').map(s => s.textContent.trim()) })));
+  settingsRoot.addEventListener('input', e => {
+    const el = e.target, k = el.dataset.key; if (!k) return;
+    const v = el.type === 'checkbox' ? el.checked : el.type === 'color' ? el.value.slice(1).toUpperCase()
+      : el.type === 'range' ? Number(el.value) : el.value;
+    setSetting(k, v);
+  });
+  settingsRoot.addEventListener('click', e => {
+    const b = e.target.closest('[data-seg] button'); if (!b || b.disabled) return;
+    const k = b.parentElement.dataset.seg;
+    setSetting(k, k === 'alignment' ? Number(b.dataset.v) : b.dataset.v);
+  });
+  $('#reset-settings').addEventListener('click', async () => {
+    if (!confirm(t('js.app.reset_confirm'))) return;
+    S = await api('/api/settings/reset', { method: 'POST' }); paintSettings(); toast(t('js.app.reset_done'));
+  });
+}
 
 // ---------------------------------------------------------------- create
 let files = [], selected = null;
@@ -431,7 +435,7 @@ $('#reveal').addEventListener('click', () => api('/api/reveal', { method: 'POST'
 
 // ---------------------------------------------------------------- init
 (async () => {
-  buildRanges($('#settings'));
+  if ($('#settings')) buildRanges($('#settings'));
   // 1) saved values (server falls back to defaults on first run)
   [S, UI] = await Promise.all([api('/api/settings'), api('/api/ui-state')]);
   paintSettings();
@@ -446,7 +450,8 @@ $('#reveal').addEventListener('click', () => api('/api/reveal', { method: 'POST'
     d.open = UI.open_groups.includes($('summary', d).textContent.trim()));
   await loadFiles();
   if (UI.selected && files.some(f => f.path === UI.selected)) select(UI.selected);
-  const start = location.hash.slice(1), pref = localStorage.getItem('start_page') || 'last';   // 作成(台本) is the main page
-  show(PAGES.includes(start) ? start : pref !== 'last' && PAGES.includes(pref) ? pref : PAGES.includes(UI.page) ? UI.page : 'story');
+  const start = location.hash.slice(1), pref = localStorage.getItem('start_page') || 'last';
+  const first = PAGES.includes(start) ? start : pref !== 'last' && PAGES.includes(pref) ? pref : PAGES.includes(UI.page) ? UI.page : 'story';
+  show(first);
   api('/api/auto').then(r => setNavBadge(r.running));
 })();

@@ -1,9 +1,12 @@
 {
-  "look": "cinema",
+  "look": "original",
   "saturation": 1,
   "contrast": 1,
   "brightness": 0,
   "warmth": 0,
   "art": "color",
-  "transition": "crosszoom"
+  "transition": "crosszoom",
+  "zoom_amount": "normal",
+  "zoom_focus": "face",
+  "transition_speed": "slow"
 }

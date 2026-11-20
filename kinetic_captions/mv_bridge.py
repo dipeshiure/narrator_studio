@@ -122,7 +122,7 @@ def main(job_path: str) -> int:
             say(f"PROGRESS {p:.3f}")
 
     say(f"字幕を書き込んでいます({len(layout['phrases'])} フレーズ)")
-    render(video, layout, out, progress=prog)
+    render(video, layout, out, progress=prog, vf=job.get("vf") or None)
     say("DONE")
     return 0
 

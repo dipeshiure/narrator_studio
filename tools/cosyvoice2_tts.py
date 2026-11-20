@@ -90,6 +90,67 @@ def wait_for_memory(low: int = 25, resume: int = 35, poll: float = 5.0) -> None:
         time.sleep(poll)
 
 
+def fit_prompt_text(prompt_text: str | None, tts_text: str) -> str | None:
+    """CosyVoice mumbles when the spoken line is much shorter than the prompt transcript.
+
+    Keep the prompt text when the line is long enough (>= half the prompt). Otherwise return
+    None so the caller uses cross-lingual mode (voice from the clip, no length trap).
+    """
+    prompt = (prompt_text or "").strip()
+    text = (tts_text or "").strip()
+    if not prompt:
+        return None
+    if not text or len(text) >= 0.5 * len(prompt):
+        return prompt
+    return None
+
+
+def audio_ok(audio, sample_rate: int, text: str, speed: float = 1.0) -> tuple[bool, str]:
+    """Reject empty, silent, or impossibly short/long clips before they get cached.
+
+    `speed` is the playback tempo already applied to `audio` (1.0 for raw CosyVoice output)."""
+    import numpy as np
+    arr = np.asarray(audio, dtype=np.float32).reshape(-1)
+    if arr.size == 0:
+        return False, "empty audio"
+    dur = arr.size / max(1, int(sample_rate))
+    peak = float(np.max(np.abs(arr)))
+    if peak < 0.01:
+        return False, f"silent audio (peak={peak:.4f})"
+    words = max(1, len(re.findall(r"[A-Za-z0-9']+", text or "")))
+    tempo = max(0.5, min(1.5, float(speed or 1.0)))
+    # ~2.5 words/s is normal narration; allow a wide band, then retry outliers
+    min_dur = max(0.35, words * 0.18) / tempo   # faster than ~330 wpm is almost certainly broken
+    max_dur = (words * 1.25 + 2.5) / tempo       # very slow / padded still ok up to here
+    if dur < min_dur:
+        return False, f"too short ({dur:.2f}s for {words} words, need >={min_dur:.2f}s)"
+    if dur > max_dur:
+        return False, f"too long ({dur:.2f}s for {words} words, need <={max_dur:.2f}s)"
+    return True, "ok"
+
+
+def wav_file_ok(path, text: str, speed: float = 1.0) -> tuple[bool, str]:
+    """Same checks as audio_ok, for an on-disk wav (skip cache of a previous bad run)."""
+    import numpy as np
+    p = Path(path)
+    if not p.exists() or p.stat().st_size < 1000:
+        return False, "missing or tiny file"
+    try:
+        # Prefer soundfile when present (cosy venv); else decode via ffmpeg (main venv).
+        try:
+            import soundfile as sf
+            audio, sr = sf.read(str(p), dtype="float32", always_2d=False)
+        except Exception:
+            sr = 44100
+            r = subprocess.run(
+                ["ffmpeg", "-v", "error", "-i", str(p), "-f", "f32le", "-ac", "1", "-ar", str(sr), "-"],
+                capture_output=True, check=True)
+            audio = np.frombuffer(r.stdout, dtype=np.float32)
+    except Exception as e:
+        return False, f"unreadable ({e})"
+    return audio_ok(audio, sr, text, speed)
+
+
 # ------------------------------------------------------------------ the wrapper
 class CosyVoiceTTS:
     """CosyVoice2 on MPS with streaming and file output.
@@ -201,8 +262,11 @@ class CosyVoiceTTS:
         if prompt_wav is None:
             raise ValueError("CosyVoice2 needs a reference voice: pass prompt_wav (and prompt_text)")
         wav = str(Path(prompt_wav).expanduser())
-        if prompt_text:
-            gen = self.cv.inference_zero_shot(text, prompt_text, wav, stream=stream, speed=speed)
+        # CosyVoice warns (and often mumbles) when the line is much shorter than the prompt
+        # transcript. Cross-lingual keeps the voice from the clip without that length trap.
+        use_text = fit_prompt_text(prompt_text, text) if prompt_text else None
+        if use_text:
+            gen = self.cv.inference_zero_shot(text, use_text, wav, stream=stream, speed=speed)
         else:
             gen = self.cv.inference_cross_lingual(text, wav, stream=stream, speed=speed)
         with self.torch.inference_mode():
@@ -225,16 +289,33 @@ class CosyVoiceTTS:
         for out in self._generate(text, prompt_wav, prompt_text, speed, stream=False):
             parts += [out["tts_speech"].squeeze(0).float().cpu().numpy(), gap]
         free_memory()
-        return np.concatenate(parts[:-1]) if parts else np.zeros(0, dtype=np.float32)
+        if not parts:
+            raise RuntimeError("CosyVoice returned no audio")
+        return np.concatenate(parts[:-1])
 
-    def synthesize_to_file(self, text, out_path, prompt_wav, prompt_text=None, speed=1.0) -> Path:
+    def synthesize_to_file(self, text, out_path, prompt_wav, prompt_text=None, speed=1.0,
+                           attempts: int = 3) -> Path:
+        """Write a valid narration wav, retrying empty / silent / too-short results."""
+        import numpy as np
         import soundfile as sf
         out = Path(out_path); out.parent.mkdir(parents=True, exist_ok=True)
-        audio = self.synthesize(text, prompt_wav, prompt_text, speed)
-        tmp = out.with_name(out.stem + ".part.wav")
-        sf.write(str(tmp), audio, self.sample_rate)
-        tmp.replace(out)                               # never leaves a half-written file behind
-        return out
+        last = None
+        for attempt in range(max(1, attempts)):
+            try:
+                audio = self.synthesize(text, prompt_wav, prompt_text, speed)
+                ok, why = audio_ok(audio, self.sample_rate, text)
+                if not ok:
+                    raise RuntimeError(why)
+                tmp = out.with_name(out.stem + ".part.wav")
+                sf.write(str(tmp), audio.astype(np.float32), self.sample_rate)
+                tmp.replace(out)                       # never leaves a half-written file behind
+                return out
+            except Exception as e:
+                last = e
+                log.warning("synthesis attempt %d/%d failed (%s)", attempt + 1, attempts, e)
+                free_memory()
+                time.sleep(1.5 * (attempt + 1))
+        raise RuntimeError(f"CosyVoice could not voice the line after {attempts} tries: {last}")
 
     def folder_to_audio(self, src: str | Path, out_dir: str | Path, prompt_wav, prompt_text=None,
                         pattern: str = "*.txt", speed: float = 1.0, overwrite: bool = False) -> list[Path]:

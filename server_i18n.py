@@ -113,6 +113,8 @@ T = {
     # ---- make_video.py
     "Pexels の API キーがありません(motiversity_auto/.env に PEXELS_API_KEY=... を書いてください)":
         "No Pexels API key (add PEXELS_API_KEY=... to .env)",
+    "Pexels の API キーがありません(.env に PEXELS_API_KEY=... を書いてください)":
+        "No Pexels API key (add PEXELS_API_KEY=... to .env)",
     "素材が {n} 本足りないので Pexels からダウンロードします": "{n} clips short, downloading from Pexels",
     "+ {q}: {n} 本": "+ {q}: {n} clips",
     "+ {q}: {n} 本ダウンロード": "+ {q}: downloaded {n} clips",
@@ -204,6 +206,42 @@ T = {
     "最終エンコード中...": "Final encode...",
     "プリセットがありません: {p}": "No such preset: {p}",
     # ---- illustrate.py / media_match.py / music.py / kinetic bridge
+    "この動画の演出を決めています(AI)": "Deciding this video's direction (AI)",
+    "画像タイムラインを作っています: {n} 場面": "Building the image timeline: {n} scenes",
+    "画像タイムライン: {n} 場面": "Image timeline: {n} scenes",
+    "画像タイムライン: {n} 場面（朗読の秒数に合わせ、同じ絵は繰り返しません）":
+        "Image timeline: {n} scenes (timed to the narration, no repeated picture)",
+    "ストック素材を場面ごとに選んでいます": "Choosing stock footage for each scene",
+    "ストック素材を探しています: {n} 場面": "Searching stock footage: {n} scenes",
+    "Pexels の API キーがないため、AI の絵にします": "No Pexels API key, using an AI picture",
+    "場面 {a}: 別の検索語でもう一度探します": "Scene {a}: searching again with another phrase",
+    "  T5 の検索語: {q}": "  T5 search query: {q}",
+    "  上位3件: {q}": "  Top 3: {q}",
+    "  Mixkit の検索は使えませんでした。Pexels の結果で比べます":
+        "  Mixkit search is unavailable. Comparing Pexels results",
+    "  素材 {n} 本を文の長さに合わせて入れました": "  Placed {n} clips timed to the spoken lines",
+    "  自動の素材が無いので、いつもの素材に戻します": "  No automatic footage, falling back to the usual clips",
+    "場面 {a}: 「{q}」 点数 {s}": "Scene {a}: \"{q}\" score {s}",
+    "場面 {a}: ストックが足りないので AI の絵にします": "Scene {a}: no suitable stock, using an AI picture",
+    "場面 {a}: 合う素材がなく、AI の絵も作りません": "Scene {a}: no suitable material, and AI pictures are off",
+    "素材の採点が終わりました: ストック {a}、AI の絵 {b}": "Scoring finished: {a} stock, {b} AI pictures",
+    "! 場面の分析に失敗しました({e})。キーワードで探します": "! Couldn't analyse the scenes ({e}). Searching by keywords",
+    "! Pexels の回数制限に当たりました": "! Pexels rate limit reached",
+    "! Pexels の検索に失敗しました({e})": "! Pexels search failed ({e})",
+    "! プレビューを採点できませんでした({e})": "! Couldn't score the preview ({e})",
+    "! 素材を保存できませんでした({e})": "! Couldn't save the material ({e})",
+    "! 素材ファイルが壊れているので捨てました({e})": "! Dropped a broken material file ({e})",
+    "足りない {n} 場面の絵の指示を作り直しています": "Rewriting the image prompt for {n} missing scenes",
+    "画像タイムラインを、台本全文でもう一度作っています": "Building the image timeline again from the whole script",
+    "タイムラインが {a}/{b} 場面で止まりました": "The timeline stopped at {a}/{b} scenes",
+    "演出のプロンプトが短すぎます": "The direction prompt was too short",
+    "台本が空です": "The script is empty",
+    "Ollama が起動していません": "Ollama is not running",
+    "タイムラインが空です": "The timeline was empty",
+    "! タイムラインの場面数があいません({a}/{b})。合う分だけ使い、残りはキーワードで補います":
+        "! Timeline length doesn't match ({a}/{b}). Using what matches; keywords fill the rest",
+    "! タイムラインを作れませんでした({e})。これまでの方法で絵の指示文を作ります":
+        "! Couldn't build the timeline ({e}). Writing image prompts the previous way",
     "! AI で絵の指示文を作れませんでした({e})。キーワードで代用します": "! Couldn't write image prompts with AI ({e}). Using keywords",
     "イラストを生成中: {n} 枚({m}, 作成済みは再利用)": "Generating {n} illustrations ({m}, reusing ones already made)",
     "イラスト {a}/{b}": "Illustration {a}/{b}",

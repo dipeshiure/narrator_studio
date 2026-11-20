@@ -19,8 +19,13 @@
   audio.addEventListener('timeupdate', () => { if (stopAt !== null && audio.currentTime >= stopAt) { audio.pause(); stopAt = null; } });
 
   // ------------------------------------------------------------ upload
+  const VIDEO_IN = document.querySelector('meta[name="narrator-video-in"]')?.content === '1';
+  const FILE_RE = VIDEO_IN
+    ? /\.(mp3|m4a|wav|aac|flac|ogg|aiff?|mp4|mov|m4v|mkv|webm)$/i
+    : /\.(mp3|m4a|wav|aac|flac|ogg|aiff?)$/i;
+
   function upload(files) {
-    files = [...files].filter(f => /\.(mp3|m4a|wav|aac|flac|ogg|aiff?)$/i.test(f.name) && !f.name.startsWith('.'));
+    files = [...files].filter(f => FILE_RE.test(f.name) && !f.name.startsWith('.'));
     if (!files.length) { toast(t('js.inbox.no_audio')); return; }
     const fd = new FormData();
     files.forEach(f => fd.append('files', f, f.name));

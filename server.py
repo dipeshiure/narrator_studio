@@ -26,7 +26,7 @@ ui_lock = threading.Lock()
 DEFAULT_SRC = Path.home() / "Desktop" / "soundcloud_motivational"
 WATCH_PATTERN = "make_video.py.*--watch"
 for d in (VIDEOS, UPLOADS, LOGS):
-    d.mkdir(exist_ok=True)
+    d.mkdir(parents=True, exist_ok=True)
 
 app = Flask(__name__, static_folder=None)
 jobs = {}   # id -> {"status": running|done|error, "log": [...], "result": str|None}
@@ -44,16 +44,22 @@ def localize_json(resp):
 
 def start_job(fn, pass_job=False, **extra):
     """Run fn(log) in a thread; with pass_job=True it gets fn(log, job) so it can update
-    its own job dict (batch progress, a cancel flag)."""
+    its own job dict (batch progress, a cancel flag). Each line also goes to stdout, so
+    start.command can show image generation and the rest of a render in the Terminal."""
     jid = uuid.uuid4().hex[:8]
     job = jobs[jid] = {"status": "running", "log": [], "result": None, **extra}
 
+    def log(msg):
+        line = str(msg)
+        job["log"].append(line)
+        print(line, flush=True)
+
     def runner():
         try:
-            job["result"] = fn(job["log"].append, job) if pass_job else fn(job["log"].append)
+            job["result"] = fn(log, job) if pass_job else fn(log)
             job["status"] = "done" if job["result"] is not False else "error"
         except Exception as e:
-            job["log"].append(f"エラー: {e}")
+            log(f"エラー: {e}")
             job["status"] = "error"
     threading.Thread(target=runner, daemon=True).start()
     return jid
@@ -72,6 +78,7 @@ def workers_running():
 #             (status waiting -> generating -> publishing -> checking -> done)
 BUSY_RUNNING = ("analyzing", "generating", "publishing", "checking")
 AUDIO_EXT = {".mp3", ".m4a", ".wav", ".aac", ".flac", ".ogg", ".aiff", ".aif"}
+VIDEO_EXT = {".mp4", ".mov", ".m4v", ".mkv", ".webm"}
 meta_lock = threading.Lock()
 analysis_q, render_q = queue.Queue(), queue.Queue()
 _workers_started = False
@@ -101,13 +108,28 @@ def update_meta(iid, **kw):
         return m
 
 
+def _voice_from_video(src):
+    """The video-upload copy keeps the picture file and analyzes a wav taken from its audio."""
+    wav = src.with_suffix(".wav")
+    mv.run(["ffmpeg", "-y", "-i", str(src), "-vn", "-ac", "1", "-ar", "44100", str(wav)])
+    return wav
+
+
 def add_to_inbox(file_storage):
     """Save one uploaded file and queue it for analysis. Returns its meta or None."""
     name = Path(file_storage.filename).name          # strips any folder part / traversal
-    if Path(name).suffix.lower() not in AUDIO_EXT or name.startswith("."):
+    suffix = Path(name).suffix.lower()
+    video_ok = os.environ.get("NARRATOR_VIDEO_IN") == "1" and suffix in VIDEO_EXT
+    if (suffix not in AUDIO_EXT and not video_ok) or name.startswith("."):
         return None
     dest = UPLOADS / name
     file_storage.save(dest)
+    if video_ok:
+        try:
+            dest = _voice_from_video(dest)
+        except Exception:
+            dest.unlink(missing_ok=True)
+            return None
     iid = item_id(dest)
     shutil.rmtree(mv.work_dir(dest), ignore_errors=True)   # same name re-uploaded: start fresh
     m = {"id": iid, "name": name, "path": str(dest), "size": dest.stat().st_size,
@@ -126,7 +148,9 @@ def process_analysis(iid):
     update_meta(iid, status="analyzing", step="準備中", error=None)
     path = Path(m["path"])
     try:
-        prep.analyze(path, mv.work_dir(path), mv.load_settings(),
+        settings = mv.load_settings()
+        settings.update(remove_music=False, trim_ads=False, tighten_pauses=False)
+        prep.analyze(path, mv.work_dir(path), settings,
                      log=lambda msg: update_meta(iid, step=msg.strip()), force=True)
         update_meta(iid, status="ready", step="")
     except Exception as e:
@@ -405,19 +429,20 @@ def finish_preview():
     f = {**mv.load_finish(), **{k: v for k, v in body.items() if k in mv.FINISH_DEFAULTS}}
     cache = HERE / "media" / "ai_illustrations"
     pics = sorted(cache.glob("*.png"), key=lambda p: p.stat().st_mtime, reverse=True)[:1] if cache.exists() else []
-    if not pics:
+    sample = pics[0] if pics else HERE / "static" / "finish_sample.png"
+    if not sample.exists():
         return jsonify({"error": "プレビュー用の絵がまだありません"}), 404
     flt = mv.finish_filter(f)
     try:
         width = max(120, min(800, int(body.get("w", 640)) // 2 * 2))
     except (TypeError, ValueError):
         width = 640
-    key = hashlib.md5((pics[0].name + flt + str(width)).encode()).hexdigest()[:12]
+    key = hashlib.md5((sample.name + flt + str(width)).encode()).hexdigest()[:12]
     out = mv.TMP / "finish_preview" / f"{key}.jpg"
     if not out.exists():
         out.parent.mkdir(parents=True, exist_ok=True)
         vf = f"scale={width}:-2" + ("," + flt if flt else "")
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(pics[0]), "-vf", vf, "-frames:v", "1", str(out)], check=True)
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(sample), "-vf", vf, "-frames:v", "1", str(out)], check=True)
     return send_file(out, mimetype="image/jpeg")
 
 
@@ -571,7 +596,10 @@ def story_settings(body):
     import story
     preset = body.get("preset") if body.get("preset") in STORY_PRESETS else "bhatt"
     s = story.load_story_settings(preset)
-    for k, v in (body.get("options") or {}).items():
+    options = body.get("options")
+    if not isinstance(options, dict):
+        options = {}
+    for k, v in options.items():
         if k in STORY_KEYS and v is not None:
             if k == "hero" and not str(v).strip():
                 continue                                 # empty = keep the genre's own (none, or the default hero)
@@ -584,9 +612,12 @@ def story_settings(body):
     if s.get("tts_engine") not in ("cosy", "edge", "say"):
         s["tts_engine"] = "cosy"
     try:
-        s["tts_speed"] = max(0.5, min(1.5, float(s.get("tts_speed", 1.0))))
+        speed = float(s.get("tts_speed", 1.0))
     except (TypeError, ValueError):
-        s["tts_speed"] = 1.0
+        speed = 1.0
+    if speed != speed or abs(speed) == float("inf"):    # NaN / infinity is not a speed
+        speed = 1.0
+    s["tts_speed"] = max(0.5, min(1.5, speed))
     if not story.my_voice(s.get("voice_id")):
         s["voice_id"] = story.DEFAULT_VOICE
     return preset, s
@@ -1502,5 +1533,5 @@ def posts_reveal():
 
 
 if __name__ == "__main__":
-    recover_inbox()
-    app.run(host="127.0.0.1", port=8510, threaded=True)
+    # Upload page is gone. Do not resume inbox analysis or renders.
+    app.run(host="127.0.0.1", port=int(os.environ.get("NARRATOR_PORT", "8510")), threaded=True)

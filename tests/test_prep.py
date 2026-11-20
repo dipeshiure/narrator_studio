@@ -172,7 +172,7 @@ def ad_audio(tmp_path_factory, assets):
 
 
 def test_ads_found_and_cut(sandbox, ad_audio):
-    s = {**mv.load_settings(), "whisper_model": "base"}
+    s = {**mv.load_settings(), "whisper_model": "base", "trim_ads": True, "remove_music": True}
     work = mv.work_dir(ad_audio); work.mkdir(parents=True)
     a = prep.analyze(ad_audio, work, s, log=lambda m: None)
     cut_text = " ".join(x["text"] for x in a["sentences"] if x["cut"]).lower()
@@ -189,7 +189,7 @@ def test_ads_found_and_cut(sandbox, ad_audio):
 
 
 def test_trim_off_keeps_everything(sandbox, ad_audio):
-    s = {**mv.load_settings(), "whisper_model": "base", "trim_ads": False, "tighten_pauses": False}
+    s = {**mv.load_settings(), "whisper_model": "base", "remove_music": True, "trim_ads": False, "tighten_pauses": False}
     work = mv.work_dir(ad_audio); work.mkdir(parents=True)
     audio, _ = prep.prepare(ad_audio, work, s, log=lambda m: None)
     assert audio.name == "voice.wav"
@@ -237,7 +237,7 @@ def test_voice_only_analysis_transcribes_the_original(sandbox, monkeypatch, tmp_
     monkeypatch.setattr(mv, "duration", lambda p: 2.0)
     mp3 = tmp_path / "v.mp3"; mp3.write_bytes(b"x")
     work = mv.work_dir(mp3)
-    a = prep.analyze(mp3, work, {**mv.load_settings(), "trim_ads": False}, log=lambda m: None)
+    a = prep.analyze(mp3, work, {**mv.load_settings(), "remove_music": True, "trim_ads": False}, log=lambda m: None)
     assert a["source"] == "original" and seen == [(mp3, "words_original.json")]
     assert a["music_db"] == -60.0
 

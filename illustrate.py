@@ -228,7 +228,7 @@ SHOT_SCHEMA = {   # Ollama structured output: the reply is forced into this JSON
     "properties": {"shots": {"type": "array", "items": {"type": "object", "properties": {
         "prompt": {"type": "string"}, "sentence": {"type": "integer"}}, "required": ["prompt", "sentence"]}}},
     "required": ["shots"]}
-MIN_SHOT = 2.0          # a picture stays at least this long (s)
+MIN_SHOT = 1.5          # a picture stays at least this long (s); Shorts need room for ~5-6s caps
 
 
 def _sentences(text):
@@ -322,15 +322,288 @@ def plan_shots(scenes, s, log=print, counts=None):
     return plan
 
 
+# One Ollama call sees the whole script, then writes one English image prompt per spoken beat.
+PROMPT_SYSTEM = (
+    "You illustrate one narrated video. Read the WHOLE script before you write any picture, "
+    "so a word means what it means in this story (a bell on a ship is the ship's bell, not a school bell). "
+    "Force visual progression: every picture moves the story forward. "
+    "Each picture shows a new action, a new object, or a new moment. "
+    "Do not repeat the previous pose, object, or composition. "
+    "A picture stays on screen for the spoken length of the lines it covers, so show those lines, not one symbol for the whole paragraph. "
+    "If a list of subjects is given, use a different subject each time. Do not put every picture in the same room. "
+    "Art style: {art_style}\n"
+    "Character: {character_setting}\n"
+    "Target image model: {target_ai}\n"
+    "Keep one world and the same character design, but change what the camera sees every time. "
+    "When a person is needed, use the character. No real people, no existing characters or franchises, no writing in the picture."
+)
+
+
+def _fill(template, **kw):
+    out = template
+    for k, v in kw.items():
+        out = out.replace("{" + k + "}", str(v))
+    return out
+
+
+def timeline_inputs(s):
+    """Art style, character and target model for the meta-prompt, from the video's own settings."""
+    art = str(s.get("art_style") or "").strip()
+    if not art:
+        art = str(s.get("style_color") if s.get("art") == "color" else s.get("style_mono") or "").strip()
+    if not art:
+        art = style_for(s)
+    hint = str(s.get("planner_hint") or "").strip()
+    if hint:
+        art = f"{art} Subjects to show: {hint}"
+    character = s.get("character_setting")
+    if character is None:
+        character = "" if s.get("hero") == "none" else str(s.get("hero") or HERO)
+    character = str(character).strip() or "No recurring character. Show the subject itself."
+    family, _, _ = engine(s)
+    target = str(s.get("target_ai") or "").strip() or ("FLUX.2 klein 4B" if family == "flux2" else "FLUX.1-schnell")
+    return art, character, target
+
+
+def _plain(text):
+    text = str(text or "").strip()
+    text = re.sub(r"^```[a-zA-Z]*\s*", "", text)
+    text = re.sub(r"\s*```$", "", text).strip()
+    if len(text) >= 2 and text[0] == text[-1] and text[0] in "\"'":
+        text = text[1:-1].strip()
+    return text
+
+
+def parse_timeline(raw):
+    """Ollama's reply -> [{script_segment, image_prompt}, ...] with those keys only."""
+    data = json.loads(_plain(raw)) if isinstance(raw, str) else raw
+    if isinstance(data, dict):
+        lists = [v for v in data.values() if isinstance(v, list)]
+        if lists:
+            data = lists[0]
+        elif data and all(isinstance(v, dict) for v in data.values()):
+            data = list(data.values())
+        else:
+            data = [data]
+    out = []
+    for item in data or []:
+        if not isinstance(item, dict):
+            continue
+        seg = str(item.get("script_segment") or "").strip()
+        prompt = clean(item.get("image_prompt") or "")
+        if seg and prompt:
+            out.append({"script_segment": seg, "image_prompt": prompt})
+    return out
+
+
+def timeline_schema(n):
+    """Force one row per paragraph. n is the paragraph number, so a short reply cannot shift the rest."""
+    row = {"type": "object", "properties": {"n": {"type": "integer"}, "image_prompt": {"type": "string"}},
+           "required": ["n", "image_prompt"]}
+    return {"type": "object", "properties": {"timeline": {"type": "array", "minItems": n, "maxItems": n, "items": row}},
+            "required": ["timeline"]}
+
+
+def _beat_groups(sc, s, t_video):
+    """Group a scene's sentences into pictures. Each picture's length is the spoken length of its lines.
+    A new picture starts once the current one has covered about shot_seconds of speech, and only on a
+    sentence boundary, so one sentence is never split into copies of the same picture."""
+    text = str(sc.get("text") or "").strip()
+    dur = float(sc.get("dur") or 0)
+    sents = _sentences(text) if text else []
+    if dur <= 0 or len(sents) <= 1:
+        return [{"text": text, "start": 0.0, "end": dur}]
+    starts = sentence_starts(sc)
+    spans = []
+    for i, sent in enumerate(sents):
+        a = float(starts[i])
+        b = float(starts[i + 1] if i + 1 < len(starts) else dur)
+        spans.append({"text": sent, "start": a, "end": max(a, b)})
+    target = max(MIN_SHOT, shot_seconds(t_video + dur / 2.0, s))
+    groups, cur = [], None
+    for sp in spans:
+        if cur is None:
+            cur = dict(sp)
+            continue
+        held = cur["end"] - cur["start"]
+        would = sp["end"] - cur["start"]
+        # Cut before overflowing the target so Shorts stay near shot_seconds
+        # (old logic waited until held >= target, which glued two lines into ~2x holds).
+        if held >= target or (would > target and held >= MIN_SHOT):
+            groups.append(cur)
+            cur = dict(sp)
+        else:
+            cur["text"] = (cur["text"] + " " + sp["text"]).strip()
+            cur["end"] = sp["end"]
+    if cur:
+        if groups and cur["end"] - cur["start"] < MIN_SHOT:
+            groups[-1]["text"] = (groups[-1]["text"] + " " + cur["text"]).strip()
+            groups[-1]["end"] = cur["end"]
+        else:
+            groups.append(cur)
+    return groups or [{"text": text, "start": 0.0, "end": dur}]
+
+
+def narration_beats(scenes, s):
+    """One beat per picture. start/end are seconds from the scene start, and end-start is how long those words are spoken."""
+    beats, t = [], 0.0
+    for i, sc in enumerate(scenes):
+        for g in _beat_groups(sc, s, t):
+            if g["text"]:
+                beats.append({"scene": i, "text": g["text"], "start": round(float(g["start"]), 2),
+                               "end": round(float(g["end"]), 2)})
+        t += float(sc.get("dur") or 0) + 0.35
+    return beats
+
+
+def _timeline_user(beats):
+    """The whole script, numbered, in one message. Every retry sends this same text."""
+    lines = []
+    for n, beat in enumerate(beats, 1):
+        start, end = beat.get("start"), beat.get("end")
+        if start is not None and end is not None and float(end) > float(start):
+            lines.append(f"{n}. ({float(start):.1f}-{float(end):.1f}s) {beat['text']}")
+        else:
+            lines.append(f"{n}. {beat['text']}")
+    numbered = "\n\n".join(lines)
+    return (f"Read every line before you write. This is one story. "
+            f"Write exactly {len(beats)} rows, one per numbered beat, in this order. Do not merge beats. "
+            "n is that beat's number. The seconds are how long those words are spoken: the picture stays up for that long. "
+            "Force visual progression. Each image_prompt must show a new moment, and the next row must not repeat it. "
+            "image_prompt is 15-35 English words of what a camera sees: subject, place, light. "
+            "No sound, no dialogue, no writing in the picture.\n\n" + numbered)
+
+
+def _read_prompts(raw):
+    """Schema reply, or a bare array, -> ({paragraph number: prompt}, prompts with no number)."""
+    data = json.loads(_plain(raw)) if isinstance(raw, str) else raw
+    if isinstance(data, dict):
+        arr = next((v for v in data.values() if isinstance(v, list)), None)
+        data = arr if arr is not None else [data]
+    found, loose = {}, []
+    for item in data or []:
+        if not isinstance(item, dict):
+            continue
+        prompt = clean(item.get("image_prompt") or "")
+        if not prompt:
+            continue
+        try:
+            num = int(item.get("n"))
+        except (TypeError, ValueError):
+            num = None
+        if num and num not in found:
+            found[num] = prompt
+        else:
+            loose.append(prompt)
+    return found, loose
+
+
+def _ask_all(system, beats, model):
+    """One structured call. The user message is the entire script."""
+    import story
+    numbers = list(range(1, len(beats) + 1))
+    raw = story._ollama(_timeline_user(beats), model, system=system, temperature=0.2,
+                        keep_alive="5m", timeout=600, schema=timeline_schema(len(beats)))
+    found, loose = _read_prompts(raw)
+    for n, prompt in zip([n for n in numbers if n not in found], loose):
+        found[n] = prompt
+    return {n: found[n] for n in numbers if n in found}
+
+
+def video_timeline(script, art_style, character_setting, target_ai, model, log=print, beats=None):
+    """One Ollama call reads the whole script and returns one image prompt per spoken beat.
+
+    Returns {"system_prompt", "art_style", "character_setting", "target_ai", "timeline"}.
+    Each timeline item has script_segment (the words that picture covers) and image_prompt.
+    When the beat has spoken times, start and end are included so the picture lasts that long.
+    The call uses a JSON schema and num_ctx=8192. A short reply is asked again with the same
+    full script, never with one paragraph alone."""
+    import prep
+    if beats is None:
+        paragraphs = [p.strip() for p in re.split(r"\n\s*\n", str(script).strip()) if p.strip()]
+        beats = [{"scene": i, "text": p, "start": None, "end": None} for i, p in enumerate(paragraphs)]
+    else:
+        beats = [b for b in beats if str(b.get("text") or "").strip()]
+    if not beats:
+        raise RuntimeError("台本が空です")
+    if not prep.ensure_ollama(log):
+        raise RuntimeError("Ollama が起動していません")
+    system = _fill(PROMPT_SYSTEM, art_style=art_style, character_setting=character_setting, target_ai=target_ai)
+    log(f"  画像タイムラインを作っています: {len(beats)} 場面")
+    prompts = _ask_all(system, beats, model)
+    if len(prompts) != len(beats):
+        log("  画像タイムラインを、台本全文でもう一度作っています")
+        again = _ask_all(system, beats, model)
+        if len(again) == len(beats):
+            prompts = again
+        else:
+            for n, prompt in again.items():
+                prompts.setdefault(n, prompt)
+    missing = [n for n in range(1, len(beats) + 1) if n not in prompts]
+    if missing:
+        raise RuntimeError(f"タイムラインが {len(beats) - len(missing)}/{len(beats)} 場面で止まりました")
+    items = []
+    for n, beat in enumerate(beats, 1):
+        row = {"script_segment": beat["text"], "image_prompt": prompts[n]}
+        start, end = beat.get("start"), beat.get("end")
+        if start is not None and end is not None and float(end) > float(start):
+            row["start"] = round(float(start), 2)
+            row["end"] = round(float(end), 2)
+        items.append(row)
+    log(f"  画像タイムライン: {len(items)} 場面（朗読の秒数に合わせ、同じ絵は繰り返しません）")
+    try:
+        mv.unload_llm()
+    except Exception:
+        pass
+    return {"system_prompt": system, "art_style": art_style, "character_setting": character_setting,
+            "target_ai": target_ai, "timeline": items}
+
+
 def plan(scenes, s, log=print):
-    """Fill sc['image_prompt'] for every scene (script value > LLM > keywords)."""
+    """Fill sc['image_prompt'] for every scene.
+
+    AI pictures use one Ollama call over the whole script. The reply is saved as timeline.json
+    and those image_prompt strings are what get drawn. A scene that already has image_prompt
+    keeps it. If Ollama fails, the older batch prompts are used, then keywords."""
     hero = "" if s.get("hero") == "none" else clean(s.get("hero") or HERO)      # "none": no recurring character
     need = [i for i, sc in enumerate(scenes) if not sc.get("image_prompt")]
-    got = llm_prompts([scenes[i] for i in need], hero, s["llm_model"], log, s.get("planner_hint", "")) if need else None
-    for j, i in enumerate(need):
-        scenes[i]["image_prompt"] = got[j] if got and got[j] else keyword_prompt(scenes[i], hero)
-    for sc in scenes:
-        sc["image_prompt"] = clean(sc["image_prompt"])
+    filled = {}
+    if need:
+        art, character, target = timeline_inputs(s)
+        subset = [scenes[i] for i in need]
+        beats = narration_beats(subset, s)
+        script = "\n\n".join(sc["text"] for sc in subset)
+        try:
+            made = video_timeline(script, art, character, target, s["llm_model"], log, beats=beats)
+            s["_from_timeline"] = True
+            if s.get("_work"):
+                mv.write_json(Path(s["_work"]) / "timeline.json", made)
+            items = made["timeline"]
+            if len(items) != len(beats):
+                log(f"  ! タイムラインの場面数があいません({len(items)}/{len(beats)})。合う分だけ使い、残りはキーワードで補います")
+            groups = {}
+            for beat, item in zip(beats, items):
+                groups.setdefault(beat["scene"], []).append((beat, item))
+            for local_i, rows in groups.items():
+                i = need[local_i]
+                filled[i] = rows[0][1]["image_prompt"]
+                shots = []
+                for beat, item in rows:
+                    start, end = beat.get("start"), beat.get("end")
+                    if start is not None and end is not None and float(end) > float(start):
+                        shots.append({"prompt": item["image_prompt"], "start": round(float(start), 2),
+                                       "end": round(float(end), 2)})
+                if shots:
+                    scenes[i]["shots"] = shots
+        except Exception as e:
+            log(f"  ! タイムラインを作れませんでした({e})。これまでの方法で絵の指示文を作ります")
+            got = llm_prompts([scenes[i] for i in need], hero, s["llm_model"], log, s.get("planner_hint", ""))
+            if got:
+                for j, i in enumerate(need):
+                    if got[j]:
+                        filled[i] = got[j]
+    for i, sc in enumerate(scenes):
+        sc["image_prompt"] = clean(sc.get("image_prompt") or filled.get(i) or keyword_prompt(sc, hero))
 
 
 def size_for(s):
@@ -338,6 +611,17 @@ def size_for(s):
     1024x576 ~44 s, 1280x720 ~105 s (bigger frames push the model into swap). The ink look
     is the same once zoomed, grained and graded."""
     return (544, 960) if s["aspect"] == "9:16" else (960, 544)
+
+
+def picture_count(sc, s, fallback):
+    """How many pictures to draw. Each timeline shot is one picture, held for its spoken seconds.
+    A timeline scene with no shot list stays one picture for the whole narration, never copies."""
+    planned = sc.get("shots")
+    if planned:
+        return len(planned)
+    if s.get("_from_timeline"):
+        return 1
+    return fallback
 
 
 def shot_seconds(t, s):
@@ -352,26 +636,40 @@ def shot_seconds(t, s):
     return fast + (slow - fast) * min(1.0, (t - until) / ramp)
 
 
-def illustrate(scenes, s, log=print):
+def _emit_ready(order, seen, done, on_image):
+    """Tell the caller about images that now exist, in job order. `seen` is how many were already reported."""
+    while seen < done and seen < len(order):
+        item = order[seen]
+        seen += 1
+        path = Path(item["path"])
+        if on_image and path.exists():
+            on_image({**item, "path": path})
+    return seen
+
+
+def illustrate(scenes, s, log=print, on_image=None):
     """Draw every scene's images. Returns {scene index: [png, ...]} (missing on failure).
-    One image per ~s['image_seconds'] of narration, each a different camera shot."""
+    One image per ~s['image_seconds'] of narration, each a different camera shot.
+    on_image(item) runs as soon as that png exists (cached ones first), so the video encode
+    can start while later pictures are still being drawn. It must return quickly."""
     plan(scenes, s, log)
     w, h = size_for(s)
     family, _, _ = engine(s)
     name = KLEIN if family == "flux2" else MODEL     # cache per model: never reuse the other's images
-    images, per_scene = [], {}
+    images, per_scene, order = [], {}, []
     t0 = 0.0
     counts = {}
     t1 = 0.0
     for i, sc in enumerate(scenes):
         counts[i] = max(1, round(sc["dur"] / shot_seconds(t1 + sc["dur"] / 2, s)))   # faster cuts near the start
         t1 += sc["dur"] + 0.35
-    sc_plan = plan_shots(scenes, s, log, counts) if s.get("shot_plan", True) else None
+    # The timeline already chose each scene's picture. Extra shot prompts would replace it.
+    sc_plan = None if s.get("_from_timeline") else (plan_shots(scenes, s, log, counts) if s.get("shot_plan", True) else None)
     if sc_plan:
         mv.write_json(Path(s["_work"]) / "shots.json" if s.get("_work") else mv.TMP / "shots.json", sc_plan)
     for i, sc in enumerate(scenes):
         planned = sc.get("shots")
-        n = len(planned) if planned else counts[i]
+        n = picture_count(sc, s, counts[i])
         for k in range(n):
             shot = SHOTS[(i + k) % len(SHOTS)] if n > 1 or i % 2 else SHOTS[0]
             base = planned[k]["prompt"] if planned else sc["image_prompt"]
@@ -381,6 +679,7 @@ def illustrate(scenes, s, log=print):
             out = CACHE / f"{key}.png"
             images.append({"prompt": prompt, "out": str(out), "seed": seed})
             per_scene.setdefault(i, []).append(out)
+            order.append({"scene": i, "shot": k, "shots": n, "path": out})
     CACHE.mkdir(parents=True, exist_ok=True)
     job = CACHE / f"job_{hashlib.md5(json.dumps(images).encode()).hexdigest()[:10]}.json"
     _, model_dir, steps = engine(s)
@@ -389,23 +688,25 @@ def illustrate(scenes, s, log=print):
     log(f"  イラストを生成中: {len(images)} 枚({'FLUX.2 klein 4B' if family == 'flux2' else 'FLUX.1-schnell'}, 作成済みは再利用)")
     proc = subprocess.Popen([str(FLUX_PY), str(BATCH), str(job)], cwd=HERE,
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    tail, shown = [], -1
+    tail, shown, seen = [], -1, 0
     for line in proc.stdout:
-        if line.startswith("MEMWAIT"):
+        if line.startswith("IMG "):
+            done, total = map(int, line.split()[1:3])
+            seen = _emit_ready(order, seen, done, on_image)
+            step = max(1, total // 10)
+            if done // step > shown or done == total:
+                shown = done // step
+                log(f"  イラスト {done}/{total}")
+        elif line.startswith("MEMWAIT"):
             log("  メモリの空きが少ないので一時停止しています(スワップを防ぐため)。ほかのアプリを閉じると再開します")
         elif line.startswith("GPUWAIT"):
             log("  ほかの重い処理(声または絵)が終わるのを待っています(同時には動かしません)")
         elif line.startswith("MEMOK"):
             log("  メモリが空いたので再開しました")
-        elif line.startswith("IMG "):
-            done, total = map(int, line.split()[1:3])
-            step = max(1, total // 10)
-            if done // step > shown or done == total:
-                shown = done // step
-                log(f"  イラスト {done}/{total}")
         elif line.strip():
             tail = (tail + [line.strip()])[-5:]
     proc.wait()
+    _emit_ready(order, seen, len(order), on_image)
     job.unlink(missing_ok=True)
     ok = {i: [p for p in ps if p.exists()] for i, ps in per_scene.items()}
     missing = sum(len(ps) for ps in per_scene.values()) - sum(len(ps) for ps in ok.values())

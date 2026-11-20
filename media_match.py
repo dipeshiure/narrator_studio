@@ -41,6 +41,19 @@ def clip():
     return _clip["model"], _clip["proc"], _clip["dev"]
 
 
+def release():
+    """Drop CLIP so the next heavy model (FLUX or the voice) is not sharing its memory."""
+    _clip.clear()
+    import gc
+    gc.collect()
+    try:
+        import torch
+        if torch.backends.mps.is_available():
+            torch.mps.empty_cache()
+    except Exception:
+        pass
+
+
 def _norm(t):
     if not hasattr(t, "norm"):          # transformers 5 wraps the projected features
         t = t.pooler_output

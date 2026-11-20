@@ -58,7 +58,7 @@ PRESETS: dict[str, dict] = {
     # calm long-form narration (BHATT-like): small lowercase tight sans, words arrive
     # one by one, the key word of a phrase in a serif italic that drops into place
     "bhatt": {
-        "max_words": 4,
+        "max_words": 5,
         "hero_single": 2.0,         # no single-word slams
         "scale_min": 0.46, "scale_max": 0.56, "single_boost": 1.0,
         "phrase_cap": 0.56, "second_cap": 0.5, "top_floor": 0.5, "lone_floor": 0.56,
@@ -149,6 +149,8 @@ MAX_HOLD = 0.45            # s; phrase lingers at most this long after last word
 MIN_PHRASE = 0.35          # s; minimum on-screen time
 HERO_EVERY = 3.0          # s of speech per single-word beat (budget)
 HERO_GAP = 1.2            # s; min distance between beats
+STOP_MAX = 0.18            # s; "the"/"it" never hold the screen alone longer than this
+STOP_MERGE_PAUSE = 0.65    # s; still glue orphan stop-words across a short hush
 
 _PUNCT_END = re.compile(r"[.!?…]+[\"')\]]*$")
 _PUNCT_SOFT = re.compile(r"[,;:\-—–]+[\"')\]]*$")
@@ -222,7 +224,32 @@ def _parse(words: list[dict]) -> list[W]:
     for a, b in zip(out, out[1:]):
         if a.pause <= 0:
             a.pause = max(0.0, b.start - a.end)
+    _tighten_stops(out)
     return out
+
+
+def _tighten_stops(ws: list[W]) -> None:
+    """Whisper/Cosy often parks lead silence on 'the'/'it'. Snap those to the next word
+    so a lone function word never sits on screen for half a second."""
+    for i, w in enumerate(ws):
+        if not w.stop:
+            continue
+        dur = w.end - w.start
+        nxt = ws[i + 1] if i + 1 < len(ws) else None
+        if nxt is None:
+            if dur > STOP_MAX:
+                w.start = round(max(w.start, w.end - STOP_MAX), 3)
+            continue
+        # Appear just before the next word; keep a tiny spoken window
+        end = min(w.end, nxt.start)
+        start = max(w.start, end - STOP_MAX)
+        if nxt.start - start > STOP_MAX:
+            start = max(w.start, nxt.start - STOP_MAX)
+            end = nxt.start
+        if start >= end:
+            start = max(w.start, end - 0.06)
+        w.start = round(start, 3)
+        w.end = round(max(start + 0.04, end), 3)
 
 
 def _score(ws: list[W]) -> None:
@@ -336,29 +363,39 @@ def _chunk(ws: list[W], P: dict, max_chars: int, heroes: set[int]) -> list[list[
                 or (len(cur) >= 2 and w.core in L.CLAUSE_STARTERS)):
             flush()
         cur.append(w)
-        if w.eos or w.soft or w.pause > PAUSE_BREAK:
+        # Don't break on a pause while the phrase is still only function words,
+        # or while it ends on a stop ("waits for a" waiting for "good day").
+        only_stops = all(x.stop for x in cur)
+        ends_on_stop = w.stop and not w.eos
+        if w.eos or w.soft or (w.pause > PAUSE_BREAK and not only_stops and not ends_on_stop):
             flush()
     flush()
 
-    # merge orphan single stop-words into a neighbour (never into a hero beat)
+    # merge orphan stop-only phrases into a neighbour (never into a hero beat)
     def is_beat(p):
         return any(x.i in heroes for x in p)
+
+    def stops_only(p):
+        return bool(p) and all(x.stop for x in p) and not any(x.eos for x in p)
 
     merged: list[list[W]] = []
     k = 0
     while k < len(phrases):
         p = phrases[k]
-        if len(p) == 1 and p[0].stop:
+        if stops_only(p):
             nxt = phrases[k + 1] if k + 1 < len(phrases) else None
             prev = merged[-1] if merged else None
-            if (nxt and not is_beat(nxt) and len(nxt) < P["max_words"]
-                    and not p[0].eos and p[0].pause <= PAUSE_BREAK):
+            gap = p[-1].pause if p else 0.0
+            if (nxt and not is_beat(nxt)
+                    and len(p) + len(nxt) <= P["max_words"]
+                    and gap <= STOP_MERGE_PAUSE):
                 phrases[k + 1] = p + nxt
                 k += 1
                 continue
-            if (prev and not is_beat(prev) and len(prev) < P["max_words"]
+            if (prev and not is_beat(prev)
+                    and len(prev) + len(p) <= P["max_words"]
                     and not prev[-1].eos):
-                prev.append(p[0])
+                prev.extend(p)
                 k += 1
                 continue
         merged.append(p)
